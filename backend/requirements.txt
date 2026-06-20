@@ -1,0 +1,11 @@
+bleach
+cryptography
+Flask
+Flask-Cors
+flask-limiter
+Flask-WTF
+mysql-connector-python
+pytest
+pytest-cov
+python-dotenv
+ruff
