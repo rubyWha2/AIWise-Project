@@ -13,6 +13,7 @@ onMounted(async () => {
 <template>
   <div>
     <h1>Articles</h1>
+    <p>Welcome to the Articles Page!</p>
 
     <div
       v-for="article in articles"
