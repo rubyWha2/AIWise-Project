@@ -1,15 +1,9 @@
 <script setup lang="ts">
-import ArticlesView from './views/ArticlesView.vue'
 </script>
 
 <template>
-<div class="min-h-screen bg-white text-zinc-900 antialiased">
-    <ArticlesView />
-    <!-- Routed views render inside the main content area -->
-    <main class="pt-16">
-
-    </main>
-    <ToastContainer />
+  <div class="min-h-screen bg-white text-zinc-900 antialiased">
+    <router-view />
   </div>
 </template>
 
