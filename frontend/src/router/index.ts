@@ -6,6 +6,7 @@ import DashboardPage from '../views/DashboardPage.vue'
 import LandingPage from '../views/LandingPage.vue'
 import LoginPage from '../views/LoginPage.vue'
 import QuizPage from '../views/QuizPage.vue'
+import ReaderView from '../views/ReaderView.vue'
 import RegisterPage from '../views/RegisterPage.vue'
 import SummaryPage from '../views/SummaryPage.vue'
 
@@ -36,6 +37,11 @@ const router = createRouter({
       path: '/articles',
       name: 'Articles',
       component: ArticlesView
+    },
+    {
+      path: '/article/:id',
+      name: 'Reader',
+      component: ReaderView
     },
     {
       path: '/quiz',

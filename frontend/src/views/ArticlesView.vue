@@ -51,19 +51,22 @@
       <div class="articles-grid">
         <div
           v-for="article in filteredArticles"
-          :key="article.id"
+          :key="article.article_id"
           class="article-card"
         >
           <div class="article-meta">
-            <span class="article-tag">{{ article.tag }}</span>
-            <span class="article-read-time">{{ article.readTime }} min read</span>
+            <span class="article-tag">{{ article.category }}</span>
           </div>
           <h2 class="article-title">{{ article.title }}</h2>
-          <p class="article-excerpt">{{ article.excerpt }}</p>
+          <p class="article-excerpt">{{ article.content?.substring(0, 180) || 'Open this article to read more.' }}</p>
           <div class="article-footer">
-            <span class="article-date">{{ article.date }}</span>
-            <router-link :to="`/quiz`" class="btn-read">Read & Quiz →</router-link>
-          </div>
+            <router-link
+                :to="`/article/${article.article_id}`"
+                class="btn-read"
+            >
+                Read Article →
+            </router-link>
+           </div>
         </div>
       </div>
 
@@ -75,28 +78,36 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import api from '../services/api'
 
 const search = ref('')
 const activeTag = ref('')
 
-const tags = ['All', 'Science', 'History', 'Technology', 'Culture', 'Health']
+const tags = ['All', 'Data Protection', 'AI']
 
-const articles = [
-  { id: 1, tag: 'Science', title: 'The Secret Life of Mitochondria', excerpt: 'Far more than just the powerhouse of the cell, mitochondria play a surprising role in signaling, immunity, and even aging.', readTime: 6, date: 'Jun 20, 2025' },
-  { id: 2, tag: 'History', title: 'The Fall of Constantinople', excerpt: 'How a 53-day siege in 1453 ended the Byzantine Empire and reshaped the political map of the known world.', readTime: 9, date: 'Jun 18, 2025' },
-  { id: 3, tag: 'Technology', title: 'How Large Language Models Work', excerpt: 'A plain-English explanation of transformers, attention mechanisms, and why GPT-4 can write poetry.', readTime: 8, date: 'Jun 16, 2025' },
-  { id: 4, tag: 'Culture', title: 'The Philosophy of Boredom', excerpt: 'Schopenhauer, Heidegger, and modern cognitive science all have something to say about why we feel bored — and why it matters.', readTime: 7, date: 'Jun 14, 2025' },
-  { id: 5, tag: 'Health', title: 'What Happens When You Sleep', excerpt: 'Sleep stages, memory consolidation, and why your brain is arguably more active at night than during the day.', readTime: 5, date: 'Jun 12, 2025' },
-  { id: 6, tag: 'Science', title: 'The Quantum Internet Is Coming', excerpt: 'Researchers are laying the groundwork for a network that cannot be hacked — and it works nothing like today\'s internet.', readTime: 10, date: 'Jun 10, 2025' },
-  { id: 7, tag: 'History', title: 'The Origins of the Silk Road', excerpt: 'Tracing the ancient trade routes that connected China, Central Asia, and Rome — and the ideas that traveled with the goods.', readTime: 8, date: 'Jun 8, 2025' },
-  { id: 8, tag: 'Technology', title: 'CRISPR: Gene Editing Explained', excerpt: 'How a bacterial immune system became one of the most powerful tools in modern medicine, and what it means for humanity.', readTime: 7, date: 'Jun 6, 2025' },
-]
+const articles = ref([])
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/articles')
+        articles.value = response.data
+    } catch (error) {
+        console.error('Failed to load articles:', error)
+    }
+})
 
 const filteredArticles = computed(() => {
-  return articles.filter(a => {
-    const matchTag = !activeTag.value || activeTag.value === 'All' || a.tag === activeTag.value
-    const matchSearch = !search.value || a.title.toLowerCase().includes(search.value.toLowerCase())
+    return articles.value.filter(article => {
+    const matchTag =
+      !activeTag.value ||
+      activeTag.value === 'All' ||
+      article.category === activeTag.value
+
+    const matchSearch =
+      !search.value ||
+      article.title.toLowerCase().includes(search.value.toLowerCase())
+
     return matchTag && matchSearch
   })
 })
