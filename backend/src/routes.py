@@ -42,6 +42,31 @@ def get_articles():
 
     return jsonify(articles)
 
+@main.route("/api/articles/<int:article_id>", methods=["GET"])
+def get_inv_article(article_id):
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+                SELECT article_id, title, content, category
+                FROM articles
+                WHERE article_id = %s
+            """, (article_id,))
+
+        row = cur.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return jsonify({"error": "Article not found"}), 404
+
+    return jsonify({
+        "article_id": row[0],
+        "title": row[1],
+        "content": row[2],
+        "category": row[3]
+    })
+
 
 @main.route("/api/quizzes", methods=["GET"])
 def get_quizzes():
@@ -53,23 +78,27 @@ def get_quizzes():
                ORDER BY quiz_id
            """, (id,))
 
-        row = cur.fetchall()
+        rows = cur.fetchall()
 
     conn.close()
 
-    if row is None:
+    if not rows:
         return jsonify({"error": "Quizzes not found"}), 404
 
-    return jsonify({
-        "quiz_id": row[0],
-        "article_id": row[1],
-        "question": row[2],
-        "option_a": row[3],
-        "option_b": row[4],
-        "option_c":	row[5],
-        "option_d": row[6],
-        "correct_answer": row[7]
+    quizzes = []
+    for row in rows:
+        quizzes.append({
+            "quiz_id": row[0],
+            "article_id": row[1],
+            "question": row[2],
+            "option_a": row[3],
+            "option_b": row[4],
+            "option_c":	row[5],
+            "option_d": row[6],
+            "correct_answer": row[7]
     })
+    return jsonify(quizzes)
+
 
 @main.route("/api/results", methods=["GET"])
 def get_results():
