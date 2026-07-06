@@ -13,32 +13,49 @@
     </header>
 
     <!-- Quiz body -->
-    <div class="quiz-body" v-if="!finished">
+    <div
+        class="quiz-body"
+        v-if="!finished && questions.length > 0"
+    >
       <div class="question-meta">
-        <span class="question-tag">{{ currentQuestion.tag }}</span>
+        <span class="question-tag">{{ currentQuestion.title }}</span>
         <span class="question-num">Question {{ currentIndex + 1 }}</span>
       </div>
-      <h1 class="question-text">{{ currentQuestion.text }}</h1>
+      <h1 class="question-text">{{ currentQuestion.question }}</h1>
+
 
       <div class="options">
-        <button
-          v-for="(option, i) in currentQuestion.options"
-          :key="i"
-          class="option"
-          :class="optionClass(i)"
-          :disabled="answered"
-          @click="selectAnswer(i)"
-        >
-          <span class="option-letter">{{ letters[i] }}</span>
-          <span class="option-text">{{ option }}</span>
-          <span class="option-indicator" v-if="answered && i === currentQuestion.correct">✓</span>
-          <span class="option-indicator option-indicator--wrong" v-if="answered && selectedIndex === i && i !== currentQuestion.correct">✗</span>
-        </button>
-      </div>
+  <button
+    v-for="letter in letters"
+    :key="letter"
+    class="option"
+    :class="optionClass(letter)"
+    :disabled="answered"
+    @click="selectAnswer(letter)"
+  >
+    <span class="option-letter">{{ letter }}</span>
 
-      <div class="explanation" v-if="answered && currentQuestion.explanation">
-        <strong>Explanation:</strong> {{ currentQuestion.explanation }}
-      </div>
+    <span class="option-text">
+      {{ currentQuestion[`option_${letter.toLowerCase()}`] }}
+    </span>
+
+    <span
+      class="option-indicator"
+      v-if="answered && letter === currentQuestion.correct_answer"
+    >
+      ✓
+    </span>
+
+    <span
+      class="option-indicator option-indicator--wrong"
+      v-if="answered &&
+             selectedAnswer === letter &&
+             letter !== currentQuestion.correct_answer"
+    >
+      ✗
+    </span>
+  </button>
+</div>
 
       <div class="question-actions">
         <button class="btn-next" v-if="answered" @click="nextQuestion">
@@ -50,60 +67,50 @@
 </template>
 
 <script setup>
+
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import api from '../services/api'
 
 const router = useRouter()
-const letters = ['A', 'B', 'C', 'D']
+const route = useRoute()
+const questions = ref([])
 
-const questions = [
-  {
-    tag: 'History',
-    text: 'In what year did Constantinople fall to Ottoman forces under Sultan Mehmed II?',
-    options: ['1389', '1453', '1492', '1521'],
-    correct: 1,
-    explanation: 'The siege lasted 53 days and ended on 29 May 1453, marking the end of the Byzantine Empire.'
-  },
-  {
-    tag: 'History',
-    text: 'Which Byzantine emperor was ruling during the fall of Constantinople?',
-    options: ['Basil II', 'Alexios I Komnenos', 'Constantine XI Palaiologos', 'John VIII Palaiologos'],
-    correct: 2,
-    explanation: 'Constantine XI Palaiologos was the last reigning Byzantine emperor, dying in the final defense of the city.'
-  },
-  {
-    tag: 'History',
-    text: 'What strategic advantage did the Ottomans use to breach the city\'s legendary walls?',
-    options: ['Naval blockade alone', 'Tunnel mining', 'Large-caliber cannon artillery', 'Biological warfare'],
-    correct: 2,
-    explanation: 'Mehmed employed massive cannons, including the famous Basilica cannon, to pound the Theodosian Walls.'
-  },
-  {
-    tag: 'History',
-    text: 'The fall of Constantinople is commonly cited as one marker of the end of which historical era?',
-    options: ['The Ancient World', 'The Middle Ages', 'The Renaissance', 'The Early Modern Period'],
-    correct: 1,
-    explanation: 'Many historians use 1453 as a conventional end date for the Middle Ages in Europe, alongside 1492 and other events.'
-  },
-  {
-    tag: 'History',
-    text: 'What name did the Ottomans give to Constantinople after its conquest?',
-    options: ['Adrianople', 'Bursa', 'Istanbul', 'Edirne'],
-    correct: 2,
-    explanation: 'The city gradually came to be known as Istanbul, a name that became official in 1930 under Atatürk\'s westernization reforms.'
-  },
-]
+onMounted(async () => {
+  try {
+    const articleId = route.query.articleId
 
+    const response = await api.get(`/quiz/${articleId}`)
+
+    questions.value = response.data
+    console.log(questions.value.length)
+    console.log(questions.value)
+
+    console.log(response.data)
+  } catch (err) {
+    console.error(err)
+  }
+})
+
+
+const letters = ['a', 'b', 'c', 'd']
+
+const score = ref(0)
+const maxScore = computed(() => questions.value.length)
 const currentIndex = ref(0)
-const selectedIndex = ref(null)
+const selectedAnswer = ref(null)
 const answered = ref(false)
 const scores = ref([])
 const finished = ref(false)
 const timeLeft = ref(30)
 let timer = null
 
-const currentQuestion = computed(() => questions[currentIndex.value])
-const progressPct = computed(() => ((currentIndex.value) / questions.length) * 100)
+const currentQuestion = computed(() => questions.value[currentIndex.value])
+const progressPct = computed(() =>
+  questions.value.length
+    ? (currentIndex.value / questions.value.length) * 100
+    : 0
+)
 
 function formatTime(s) {
   return s < 10 ? `0:0${s}` : `0:${s}`
@@ -124,30 +131,40 @@ function startTimer() {
   }, 1000)
 }
 
-function selectAnswer(i) {
+function selectAnswer(answer) {
   if (answered.value) return
-  selectedIndex.value = i
+
   answered.value = true
+  selectedAnswer.value = answer
+
   clearInterval(timer)
-  scores.value.push(i === currentQuestion.value.correct)
+
+  if (answer === currentQuestion.value.correct_answer) {
+    score.value++
+  }
 }
 
-function optionClass(i) {
+function optionClass(letter) {
   if (!answered.value) return ''
-  if (i === currentQuestion.value.correct) return 'option--correct'
-  if (i === selectedIndex.value) return 'option--wrong'
+
+  if (letter === currentQuestion.value.correct_answer)
+    return 'option--correct'
+
+  if (letter === selectedAnswer.value)
+    return 'option--wrong'
+
   return 'option--dim'
 }
 
 function nextQuestion() {
-  if (currentIndex.value < questions.length - 1) {
+  if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
-    selectedIndex.value = null
+    selectedAnswer.value = null
     answered.value = false
     startTimer()
   } else {
     finished.value = true
-    router.push({ name: 'Summary', query: { correct: scores.value.filter(Boolean).length, total: questions.length } })
+    router.push({ name: 'Summary', query: { correct: score.value, maxScore: maxScore.value } })
   }
 }
 

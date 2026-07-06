@@ -60,8 +60,8 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-const correct = computed(() => parseInt(route.query.correct ?? 4))
-const total = computed(() => parseInt(route.query.total ?? 5))
+const correct = computed(() => Number(route.query.correct ?? 0))
+const total = computed(() => Number(route.query.maxScore ?? 0))
 const timeSpent = computed(() => parseInt(route.query.avgTime ?? 18))
 
 const scorePercent = computed(() => Math.round((correct.value / total.value) * 100))

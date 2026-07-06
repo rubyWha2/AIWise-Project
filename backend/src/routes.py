@@ -99,6 +99,52 @@ def get_quizzes():
     })
     return jsonify(quizzes)
 
+@main.route("/api/quiz/<int:article_id>", methods=["GET"])
+def get_inv_quiz(article_id):
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                q.quiz_id,
+                q.article_id,
+                a.title,
+                q.question,
+                q.option_a,
+                q.option_b,
+                q.option_c,
+                q.option_d,
+                q.correct_answer
+            FROM quizzes q
+            JOIN articles a
+                ON q.article_id = a.article_id
+            WHERE q.article_id = %s
+            ORDER BY q.quiz_id
+        """, (article_id,))
+        rows = cur.fetchall()
+
+    conn.close()
+
+    if not rows:
+        return jsonify({"error": "Quizzes not found"}), 404
+
+    quizzes = []
+    for row in rows:
+        quizzes.append({
+            "quiz_id": row[0],
+            "article_id": row[1],
+            "article_title": row[2],
+            "question": row[3],
+            "option_a": row[4],
+            "option_b": row[5],
+            "option_c": row[6],
+            "option_d": row[7],
+            "correct_answer": row[8]
+    })
+    return jsonify(quizzes)
+
+
+
 
 @main.route("/api/results", methods=["GET"])
 def get_results():
