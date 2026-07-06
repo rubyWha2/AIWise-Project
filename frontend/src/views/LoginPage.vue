@@ -67,6 +67,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../services/api'
 
 const router = useRouter()
 const showPassword = ref(false)
@@ -91,9 +92,14 @@ async function handleLogin() {
   loading.value = true
   serverError.value = ''
   try {
-    // TODO: replace with actual API call
-    await new Promise(r => setTimeout(r, 800))
+    const response = await api.post('/login', {
+    email: form.email,
+    password: form.password
+    })
+
+    console.log(response.data)
     router.push('/dashboard')
+
   } catch (e) {
     serverError.value = 'Invalid email or password.'
   } finally {

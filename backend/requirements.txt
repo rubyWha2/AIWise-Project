@@ -10,3 +10,4 @@ pytest-cov
 python-dotenv
 ruff
 psycopg[binary]
+werkzeug.security

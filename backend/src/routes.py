@@ -4,6 +4,7 @@ API routes: auth, user management and data endpoints
 
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request, current_app, session
+from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection
 
 main = Blueprint('main', __name__)
@@ -229,3 +230,37 @@ def get_users():
         })
 
     return jsonify(users)
+
+@main.route("/register", methods=["POST"])
+def register():
+    conn = get_db_connection()
+    #hashed_password = generate_password_hash(password)
+    conn.close()
+
+@main.route("/api/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    email = data.get("email")
+    password = data.get("password")
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, username, password_hash, role_id FROM users WHERE email = %s", (email,))
+
+        user = cur.fetchone()
+    conn.close()
+    if user is None:
+        return jsonify({"message": "Invalid email or password"}), 401
+
+    if not check_password_hash(user[2], password):
+        return jsonify({"message": "Invalid email or password"}), 401
+
+    session["user_id"] = user[0]
+
+    return jsonify({
+        "message": "Login successful",
+        "user_id": user[0],
+        "username": user[1],
+        "role_id": user[3]
+    }), 200
