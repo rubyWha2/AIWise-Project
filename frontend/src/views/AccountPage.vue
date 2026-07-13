@@ -82,27 +82,10 @@
       <!-- Password -->
       <section v-if="activeTab === 'password'" class="card">
         <div class="card-section">
-          <h2>Change password</h2>
-          <form @submit.prevent="savePassword" class="form-grid">
-            <div class="field field--full">
-              <label>Current password</label>
-              <input v-model="pw.current" type="password" placeholder="••••••••" />
-            </div>
-            <div class="field field--full">
-              <label>New password</label>
-              <input v-model="pw.next" type="password" placeholder="At least 8 characters" />
-            </div>
-            <div class="field field--full">
-              <label>Confirm new password</label>
-              <input v-model="pw.confirm" type="password" placeholder="••••••••" />
-              <span v-if="pw.next && pw.confirm && pw.next !== pw.confirm" class="field-error">
-                Passwords don't match.
-              </span>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Update password</button>
-            </div>
-          </form>
+          <h2>Need to update your password? No worries, click the button below.</h2>
+            <router-link to="/forgot-password" class="btn-reset-password">
+                Change Password
+            </router-link>
         </div>
       </section>
 
@@ -193,12 +176,6 @@ const prefs = reactive([
 function saveProfile() {
   profileSaved.value = true
   setTimeout(() => { profileSaved.value = false }, 3000)
-}
-
-function savePassword() {
-  pw.current = ''
-  pw.next = ''
-  pw.confirm = ''
 }
 
 function handleLogout() {
@@ -316,6 +293,19 @@ function handleLogout() {
 }
 .btn-danger:hover { background: #b91c1c; }
 .saved-msg { font-size: 13px; color: #10b981; font-weight: 600; }
+.btn-reset-password {
+  display: inline-block;
+  padding: 12px 20px;
+  background: #3730a3;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.btn-reset-password:hover {
+  background: #312e81;
+}
 
 /* Preferences */
 .prefs-list { display: flex; flex-direction: column; gap: 0; }

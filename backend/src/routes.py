@@ -317,8 +317,50 @@ def login():
         "role_id": user[3]
     }), 200
 
+@main.route("/api/changePassword", methods=["POST"])
+def change_password():
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    data = request.get_json()
 
-#@main.route("/changePassword", methods=["POST"])
+    email = data.get("email")
+    old_password = data.get("oldPassword")
+    new_password = data.get("newPassword")
+    confirm_new_password = data.get("confirmPassword")
+
+    if new_password != confirm_new_password:
+        return jsonify({"message": "New passwords must match"}), 401
+
+    if not all([email, old_password, new_password, confirm_new_password]):
+        return jsonify({"message": "Missing required fields"}), 400
+    if not re.match(email_regex, email):
+        return jsonify({"message": "Invalid email format"}), 400
+    if len(confirm_new_password) < 8:
+        return jsonify({"message": "Password must be at least 8 characters long"}), 400
+    if len(confirm_new_password) > 28:
+        return jsonify({"message": "Password must be at most 28 characters long"}), 400
+    if not re.search(r"[A-Z]", confirm_new_password):
+        return jsonify({"message": "Password must contain an uppercase letter"}), 400
+    if not re.search(r"[a-z]", confirm_new_password):
+        return jsonify({"message": "Password must contain a lowercase letter"}), 400
+    if not re.search(r"\d", confirm_new_password):
+        return jsonify({"message": "Password must contain a number"}), 400
+    if not re.search(r"[!@#$%^&*()]", confirm_new_password):
+        return jsonify({"message": "Password must contain a special character"}), 400
+
+    peppered_new_password = confirm_new_password + PEPPER
+    hashed_password = generate_password_hash(peppered_new_password)
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET password_hash = %s WHERE email = %s", (hashed_password,email,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Password changed successfully",
+        "email": email,
+    }), 200
+
 #@main.route("/updateAccount", methods=["POST"])
 #@main.route("/deleteAccount", methods=["POST"])
-#@main.route("/logOut", methods=["POST"])

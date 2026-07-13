@@ -9,6 +9,7 @@ import QuizPage from '../views/QuizPage.vue'
 import ReaderView from '../views/ReaderView.vue'
 import RegisterPage from '../views/RegisterPage.vue'
 import SummaryPage from '../views/SummaryPage.vue'
+import ForgotPassword from '../views/ForgotPassword.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -57,6 +58,11 @@ const router = createRouter({
       path: '/account',
       name: 'Account',
       component: AccountPage
+    },
+    {
+        path: '/forgot-password',
+        name: 'ForgotPassword',
+        component: ForgotPassword
     },
     {
       path: '/admin',
