@@ -6,6 +6,12 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request, current_app, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection
+from dotenv import load_dotenv
+import re
+import os
+
+load_dotenv()
+PEPPER = os.getenv("PASSWORD_PEPPER")
 
 main = Blueprint('main', __name__)
 
@@ -231,11 +237,56 @@ def get_users():
 
     return jsonify(users)
 
-@main.route("/register", methods=["POST"])
+@main.route("/api/register", methods=["POST"])
 def register():
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+
+    data = request.get_json()
+    firstName = data.get("firstName")
+    lastName = data.get("lastName")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not all([firstName, lastName, email, password]):
+        return jsonify({"message": "Missing required fields"}), 400
+    if not re.match(email_regex, email):
+        return jsonify({"message": "Invalid email format"}), 400
+    if len(password) < 8:
+        return jsonify({"message": "Password must be at least 8 characters long"}), 400
+    if len(password) > 28:
+        return jsonify({"message": "Password must be at most 28 characters long"}), 400
+    if not re.search(r"[A-Z]", password):
+        return jsonify({"message": "Password must contain an uppercase letter"}), 400
+    if not re.search(r"[a-z]", password):
+        return jsonify({"message": "Password must contain a lowercase letter"}), 400
+    if not re.search(r"\d", password):
+        return jsonify({"message": "Password must contain a number"}), 400
+    if not re.search(r"[!@#$%^&*()]", password):
+        return jsonify({"message": "Password must contain a special character"}), 400
+
     conn = get_db_connection()
-    #hashed_password = generate_password_hash(password)
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT email FROM users WHERE email = %s", (email,))
+        user = cur.fetchone()
     conn.close()
+
+    if user is not None:
+        return jsonify({"message": "Email already exists"}), 400
+
+
+    peppered_password = password + PEPPER
+    hashed_password = generate_password_hash(peppered_password)
+    created_date = datetime.now(timezone.utc)
+    role_id = 2 #automatically a user role
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO users (username, email, password_hash, role_id, created_at) VALUES (%s, %s, %s, %s, %s)", (firstName +  lastName, email, hashed_password, role_id, created_date))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "User registered successfully"}), 201
 
 @main.route("/api/login", methods=["POST"])
 def login():
@@ -243,6 +294,7 @@ def login():
 
     email = data.get("email")
     password = data.get("password")
+    peppered_password = password + PEPPER
 
     conn = get_db_connection()
     with conn.cursor() as cur:
@@ -253,7 +305,7 @@ def login():
     if user is None:
         return jsonify({"message": "Invalid email or password"}), 401
 
-    if not check_password_hash(user[2], password):
+    if not check_password_hash(user[2], peppered_password):
         return jsonify({"message": "Invalid email or password"}), 401
 
     session["user_id"] = user[0]
@@ -264,3 +316,9 @@ def login():
         "username": user[1],
         "role_id": user[3]
     }), 200
+
+
+#@main.route("/changePassword", methods=["POST"])
+#@main.route("/updateAccount", methods=["POST"])
+#@main.route("/deleteAccount", methods=["POST"])
+#@main.route("/logOut", methods=["POST"])

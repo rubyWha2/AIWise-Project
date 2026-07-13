@@ -89,6 +89,7 @@
 import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
+import api from '../services/api'
 const router = useRouter()
 const showPassword = ref(false)
 const loading = ref(false)
@@ -111,6 +112,7 @@ const pwStrength = computed(() => {
   if (/[A-Z]/.test(p)) score++
   if (/[0-9]/.test(p)) score++
   if (/[^A-Za-z0-9]/.test(p)) score++
+  if (p.length >= 12) score++
   const levels = ['weak', 'weak', 'fair', 'good', 'strong']
   const labels = ['Weak', 'Weak', 'Fair', 'Good', 'Strong']
   return { level: levels[score], pct: (score / 4) * 100, label: labels[score] }
@@ -118,13 +120,44 @@ const pwStrength = computed(() => {
 
 function validate() {
   let valid = true
+
   Object.keys(errors).forEach(k => errors[k] = '')
-  if (!form.firstName) { errors.firstName = 'Required.'; valid = false }
-  if (!form.lastName) { errors.lastName = 'Required.'; valid = false }
-  if (!form.email) { errors.email = 'Email is required.'; valid = false }
-  else if (!/\S+@\S+\.\S+/.test(form.email)) { errors.email = 'Enter a valid email.'; valid = false }
-  if (!form.password) { errors.password = 'Password is required.'; valid = false }
-  else if (form.password.length < 8) { errors.password = 'At least 8 characters.'; valid = false }
+
+  if (!form.firstName) {
+    errors.firstName = 'Required.'
+    valid = false
+  }
+
+  if (!form.lastName) {
+    errors.lastName = 'Required.'
+    valid = false
+  }
+
+  if (!form.email) {
+    errors.email = 'Email is required.'
+    valid = false
+  } else if (!/\S+@\S+\.\S+/.test(form.email)) {
+    errors.email = 'Enter a valid email.'
+    valid = false
+  }
+
+  if (!form.password) {
+    errors.password = 'Password is required.'
+    valid = false
+  } else if (form.password.length < 8) {
+    errors.password = 'Must be at least 8 characters.'
+    valid = false
+  } else if (form.password.length > 28) {
+    errors.password = 'Must be less than 28 characters.'
+    valid = false
+  } else if (
+    !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*()]).{8,28}/.test(form.password)
+  ) {
+    errors.password =
+      'Must contain uppercase, lowercase, number and special character.'
+    valid = false
+  }
+
   return valid
 }
 
@@ -133,10 +166,29 @@ async function handleRegister() {
   loading.value = true
   serverError.value = ''
   try {
-    await new Promise(r => setTimeout(r, 800))
-    router.push('/dashboard')
+    const response = await api.post('/register', {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      password: form.password
+    })
+    console.log(response.data)
+
+    // Clear the form
+    form.firstName = ''
+    form.lastName = ''
+    form.email = ''
+    form.password = ''
+
+    router.push('/login')
+
   } catch (e) {
-    serverError.value = 'Something went wrong. Please try again.'
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
   } finally {
     loading.value = false
   }
