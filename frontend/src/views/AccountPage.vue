@@ -19,8 +19,8 @@
         <div class="user-card">
           <div class="avatar">AR</div>
           <div>
-            <div class="user-name">Alex Rivera</div>
-            <div class="user-email">alex@example.com</div>
+            <div class="user-name">Tyler Durden</div>
+            <div class="user-email">tyler@PaperStreetSoapCo.com</div>
           </div>
         </div>
         <button class="logout-btn" type="button" @click="handleLogout">Log out</button>
@@ -47,22 +47,24 @@
       <section v-if="activeTab === 'profile'" class="card">
         <div class="card-section">
           <h2>Profile information</h2>
-          <form @submit.prevent="saveProfile" class="form-grid">
+          <h3>Please complete all fields to update profile details.</h3>
+          <div style="height: 20px;"></div>
+          <form @submit.prevent="handleUpdateAccount" class="form-grid">
             <div class="field">
               <label>First name</label>
-              <input v-model="profile.firstName" type="text" />
+              <input v-model="updateForm.firstName" type="text" />
             </div>
             <div class="field">
               <label>Last name</label>
-              <input v-model="profile.lastName" type="text" />
+              <input v-model="updateForm.lastName" type="text" />
             </div>
             <div class="field field--full">
               <label>Email</label>
-              <input v-model="profile.email" type="email" />
+              <input v-model="updateForm.email" type="email" />
             </div>
             <div class="field field--full">
               <label>Bio <span class="optional">(optional)</span></label>
-              <textarea v-model="profile.bio" rows="3" placeholder="Tell us a bit about yourself…"></textarea>
+              <textarea v-model="updateForm.bio" rows="3" placeholder="Tell us a bit about yourself…"></textarea>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn-primary">Save changes</button>
@@ -185,6 +187,7 @@ const loading = ref(false)
 const serverError = ref('')
 
 const deleteForm = reactive({ email: ''})
+const updateForm = reactive({ firstName: '', lastName: '', email: '', bio: ''})
 const errors = reactive({  email: '' })
 
 
@@ -225,26 +228,31 @@ function validateUpdate() {
 
   Object.keys(errors).forEach(k => errors[k] = '')
 
-  if (!deleteForm.email) {
+  if (!updateForm.email) {
     serverError.value = 'Email is required.'
     valid = false
-  } else if (!/\S+@\S+\.\S+/.test(form.email)) {
+  } else if (!/\S+@\S+\.\S+/.test(updateForm.email)) {
     errors.email = 'Enter a valid email.'
     valid = false
   }
-  if (!form.firstName) {
+  if (!updateForm.firstName) {
     errors.firstName = 'Required.'
     valid = false
   }
 
-  if (!form.lastName) {
+  if (!updateForm.lastName) {
     errors.lastName = 'Required.'
     valid = false
   }
-   //bio missing
+
+  if (!updateForm.lastName) {
+    errors.lastName = 'Required.'
+    valid = false
+  }
 
   return valid
 }
+
 function validateEmail() {
   let valid = true
 
@@ -276,6 +284,43 @@ async function handleDeleteAccount() {
     deleteForm.email = ''
 
     router.push('/login')
+
+  } catch (e) {
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleUpdateAccount() {
+  if (!validateUpdate()) return
+  loading.value = true
+  serverError.value = ''
+  try {
+    const response = await api.post('/updateAccount', {
+      firstName: updateForm.firstName,
+      lastName: updateForm.lastName,
+      email: updateForm.email,
+      bio: updateForm.bio
+    })
+    console.log(response.data)
+
+    // Clear the form
+    updateForm.firstName = ''
+    updateForm.lastName = ''
+    updateForm.email = ''
+    updateForm.bio = ''
+
+    profileSaved.value = true
+
+    setTimeout(() => {
+        profileSaved.value = false
+    }, 3000)
 
   } catch (e) {
     console.log(e)
@@ -444,6 +489,9 @@ async function handleDeleteAccount() {
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
   display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+h3 {
+  color: #111827;
 }
 .modal {
   background: #fff; border-radius: 16px; padding: 36px;

@@ -364,13 +364,35 @@ def change_password():
 
 @main.route("/api/updateAccount", methods=["POST"])
 def update_account():
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     data = request.get_json()
+
     email = data.get("email")
     firstName = data.get("firstName")
     lastName = data.get("lastName")
-    role_id = data.get("role_id")
+    bio = data.get("bio")
 
+    if not all([email, firstName, lastName, bio]):
+        return jsonify({"message": "Missing required fields"}), 400
 
+    if len(bio) > 255:
+        return jsonify({"message": "Bio must be at most 255 characters long"}), 400
+    if len(firstName) > 50:
+        return jsonify({"message": "First name must be at most 50 characters long"}), 400
+    if len(lastName) > 50:
+        return jsonify({"message": "Last name must be at most 50 characters long"}), 400
+    if not re.match(email_regex, email):
+        return jsonify({"message": "Invalid email format"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET username = %s, bio = %s WHERE email = %s", (firstName +  lastName, bio, email,))
+    conn.commit()
+    conn.close()
+    return jsonify({
+        "message": "Account updated successfully",
+        "email": email,
+    }), 200
 
 @main.route("/api/deleteAccount", methods=["POST"])
 def delete_account():
