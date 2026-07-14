@@ -47,13 +47,6 @@
       <section v-if="activeTab === 'profile'" class="card">
         <div class="card-section">
           <h2>Profile information</h2>
-          <div class="avatar-row">
-            <div class="avatar-lg">AR</div>
-            <div>
-              <button class="btn-outline btn-sm">Upload photo</button>
-              <p class="hint">JPG or PNG, max 2 MB.</p>
-            </div>
-          </div>
           <form @submit.prevent="saveProfile" class="form-grid">
             <div class="field">
               <label>First name</label>
@@ -89,10 +82,13 @@
         </div>
       </section>
 
-      <!-- Preferences -->
-      <section v-if="activeTab === 'preferences'" class="card">
+      <!-- Email Preferences -->
+      <section v-if="activeTab === 'email verification'" class="card">
         <div class="card-section">
-          <h2>Preferences</h2>
+        <div>
+            <button class="btn-verfi" >Verify Email</button>
+            <div class="danger-desc">Email verification for accounts is a security process that ensures a user controls the email address they register with.</div>
+        </div>
           <div class="prefs-list">
             <div class="pref-row" v-for="pref in prefs" :key="pref.key">
               <div class="pref-info">
@@ -128,15 +124,50 @@
 
       <!-- Delete confirmation modal -->
       <div class="modal-backdrop" v-if="confirmDelete" @click.self="confirmDelete = false">
-        <div class="modal">
-          <h2>Are you absolutely sure?</h2>
-          <p>This will permanently delete your account, all quiz history, and your progress. There is no going back.</p>
-          <div class="modal-actions">
-            <button class="btn-outline" @click="confirmDelete = false">Cancel</button>
-            <button class="btn-danger">Yes, delete my account</button>
+       <div class="modal">
+        <h2>Delete Account</h2>
+
+        <p>
+            Enter your email to permanently delete your account.
+        </p>
+
+        <form @submit.prevent="handleDeleteAccount">
+
+          <div class="field">
+            <label>Email</label>
+            <input
+              v-model="deleteForm.email"
+              type="email"
+              required
+            />
           </div>
-        </div>
-      </div>
+
+          <div style="height: 20px;"></div>
+
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-outline"
+              @click="confirmDelete = false"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              class="btn-danger"
+            >
+              Delete Account
+            </button>
+          </div>
+
+          <p v-if="serverError" class="field-error">
+            {{ serverError }}
+          </p>
+
+        </form>
+    </div>
+    </div>
     </main>
   </div>
 </template>
@@ -144,16 +175,23 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../services/api'
 
 const router = useRouter()
 const activeTab = ref('profile')
 const profileSaved = ref(false)
 const confirmDelete = ref(false)
+const loading = ref(false)
+const serverError = ref('')
+
+const deleteForm = reactive({ email: ''})
+const errors = reactive({  email: '' })
+
 
 const tabs = [
   { key: 'profile', label: 'Profile' },
   { key: 'password', label: 'Password' },
-  { key: 'preferences', label: 'Preferences' },
+  { key: 'email verification', label: 'Email verification' },
   { key: 'danger', label: 'Danger zone' },
 ]
 
@@ -167,10 +205,8 @@ const profile = reactive({
 const pw = reactive({ current: '', next: '', confirm: '' })
 
 const prefs = reactive([
-  { key: 'emailDigest', label: 'Weekly email digest', desc: 'Receive a summary of new articles every Monday.', value: true },
   { key: 'quizReminders', label: 'Quiz reminders', desc: 'Get notified when you have uncompleted quizzes.', value: false },
-  { key: 'streakAlerts', label: 'Streak alerts', desc: "We'll warn you before your daily streak breaks.", value: true },
-  { key: 'publicProfile', label: 'Public profile', desc: 'Let other users see your stats and progress.', value: false },
+  { key: '2StepVerification', label: 'Enable  2-Step Verification', desc: "Add an extra layer of security by requiring a password and security question", value: true }
 ])
 
 function saveProfile() {
@@ -182,6 +218,75 @@ function handleLogout() {
   localStorage.clear()
   sessionStorage.clear()
   router.push('/')
+}
+
+function validateUpdate() {
+  let valid = true
+
+  Object.keys(errors).forEach(k => errors[k] = '')
+
+  if (!deleteForm.email) {
+    serverError.value = 'Email is required.'
+    valid = false
+  } else if (!/\S+@\S+\.\S+/.test(form.email)) {
+    errors.email = 'Enter a valid email.'
+    valid = false
+  }
+  if (!form.firstName) {
+    errors.firstName = 'Required.'
+    valid = false
+  }
+
+  if (!form.lastName) {
+    errors.lastName = 'Required.'
+    valid = false
+  }
+   //bio missing
+
+  return valid
+}
+function validateEmail() {
+  let valid = true
+
+  Object.keys(errors).forEach(k => errors[k] = '')
+
+  if (!deleteForm.email) {
+    errors.email = 'Email is required.'
+    valid = false
+  } else if (!/\S+@\S+\.\S+/.test(deleteForm.email)) {
+    errors.email = 'Enter a valid email.'
+    valid = false
+  }
+
+  return valid
+}
+
+async function handleDeleteAccount() {
+  console.log("Delete function called");
+  if (!validateEmail()) return
+  loading.value = true
+  serverError.value = ''
+  try {
+    const response = await api.post('/deleteAccount', {
+      email: deleteForm.email
+    })
+    console.log(response.data)
+
+    // Clear the form
+    deleteForm.email = ''
+
+    router.push('/login')
+
+  } catch (e) {
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -344,7 +449,7 @@ function handleLogout() {
   background: #fff; border-radius: 16px; padding: 36px;
   max-width: 420px; width: 90%;
 }
-.modal h2 { font-size: 20px; font-weight: 800; margin: 0 0 12px; }
+.modal h2 { font-size: 20px; font-weight: 800; margin: 0 0 12px; color: #111827; }
 .modal p { font-size: 14px; color: #666; line-height: 1.6; margin: 0 0 28px; }
 .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
 

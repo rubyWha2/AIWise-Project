@@ -362,5 +362,29 @@ def change_password():
         "email": email,
     }), 200
 
-#@main.route("/updateAccount", methods=["POST"])
-#@main.route("/deleteAccount", methods=["POST"])
+@main.route("/api/updateAccount", methods=["POST"])
+def update_account():
+    data = request.get_json()
+    email = data.get("email")
+    firstName = data.get("firstName")
+    lastName = data.get("lastName")
+    role_id = data.get("role_id")
+
+
+
+@main.route("/api/deleteAccount", methods=["POST"])
+def delete_account():
+    data = request.get_json()
+    email = data.get("email")
+    if not email:
+        return jsonify({"message": "Email is required"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM users WHERE email = %s", (email,))
+    conn.commit()
+    conn.close()
+    return jsonify({
+        "message": "Account deleted successfully",
+        "email": email,
+    }), 200
