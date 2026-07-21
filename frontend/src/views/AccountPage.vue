@@ -179,6 +179,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
 
+
 const router = useRouter()
 const activeTab = ref('profile')
 const profileSaved = ref(false)
@@ -215,12 +216,6 @@ const prefs = reactive([
 function saveProfile() {
   profileSaved.value = true
   setTimeout(() => { profileSaved.value = false }, 3000)
-}
-
-function handleLogout() {
-  localStorage.clear()
-  sessionStorage.clear()
-  router.push('/')
 }
 
 function validateUpdate() {
@@ -269,6 +264,19 @@ function validateEmail() {
   return valid
 }
 
+async function handleLogout() {
+  try {
+  await api.post("/logout")
+
+    localStorage.clear()
+    sessionStorage.clear()
+
+    router.push("/")
+  } catch (e) {
+    console.error("Logout failed:", e)
+  }
+}
+
 async function handleDeleteAccount() {
   console.log("Delete function called");
   if (!validateEmail()) return
@@ -276,7 +284,6 @@ async function handleDeleteAccount() {
   serverError.value = ''
   try {
     const response = await api.post('/deleteAccount', {
-      email: deleteForm.email
     })
     console.log(response.data)
 
@@ -305,7 +312,6 @@ async function handleUpdateAccount() {
     const response = await api.post('/updateAccount', {
       firstName: updateForm.firstName,
       lastName: updateForm.lastName,
-      email: updateForm.email,
       bio: updateForm.bio
     })
     console.log(response.data)

@@ -8,5 +8,5 @@ def create_app():
     app = Flask(__name__)
     app.register_blueprint(main)
     app.secret_key = os.getenv("SECRET_KEY")
-    CORS(app)
+    CORS(app, supports_credentials=True)
     return app

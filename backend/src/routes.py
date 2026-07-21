@@ -308,7 +308,11 @@ def login():
     if not check_password_hash(user[2], peppered_password):
         return jsonify({"message": "Invalid email or password"}), 401
 
+    session.clear()  # clear a session
+    #new session
     session["user_id"] = user[0]
+    session["username"] = user[1]
+    session["role_id"] = user[3]
 
     return jsonify({
         "message": "Login successful",
@@ -319,6 +323,12 @@ def login():
 
 @main.route("/api/changePassword", methods=["POST"])
 def change_password():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+
     email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     data = request.get_json()
 
@@ -347,32 +357,46 @@ def change_password():
     if not re.search(r"[!@#$%^&*()]", confirm_new_password):
         return jsonify({"message": "Password must contain a special character"}), 400
 
-    peppered_new_password = confirm_new_password + PEPPER
-    hashed_password = generate_password_hash(peppered_new_password)
-
     conn = get_db_connection()
-
     with conn.cursor() as cur:
-        cur.execute("UPDATE users SET password_hash = %s WHERE email = %s", (hashed_password,email,))
-    conn.commit()
-    conn.close()
+        cur.execute("SELECT password_hash FROM users WHERE user_id = %s",(user_id,))
+        user = cur.fetchone()
 
-    return jsonify({
-        "message": "Password changed successfully",
-        "email": email,
-    }), 200
+        if user is None:
+            return jsonify({"message": "User does not exist"}), 401
+
+        if not check_password_hash(user[0], old_password+PEPPER):
+            return jsonify({"message": "Old password is incorrect"}), 401
+
+        peppered_new_password = confirm_new_password + PEPPER
+        hashed_password = generate_password_hash(peppered_new_password)
+
+        cur.execute("UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed_password, user_id,))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Password changed successfully"}), 200
+
+
 
 @main.route("/api/updateAccount", methods=["POST"])
 def update_account():
-    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    user_id = session.get("user_id")
+
+    if not user_id:
+        print(session)
+        print(session.get("user_id"))
+        return jsonify({"message": "Please log in"}), 401
+
     data = request.get_json()
 
-    email = data.get("email")
+    #email = data.get("email")
     firstName = data.get("firstName")
     lastName = data.get("lastName")
     bio = data.get("bio")
 
-    if not all([email, firstName, lastName, bio]):
+    if not all([firstName, lastName, bio]):
         return jsonify({"message": "Missing required fields"}), 400
 
     if len(bio) > 255:
@@ -381,32 +405,36 @@ def update_account():
         return jsonify({"message": "First name must be at most 50 characters long"}), 400
     if len(lastName) > 50:
         return jsonify({"message": "Last name must be at most 50 characters long"}), 400
-    if not re.match(email_regex, email):
-        return jsonify({"message": "Invalid email format"}), 400
 
     conn = get_db_connection()
     with conn.cursor() as cur:
-        cur.execute("UPDATE users SET username = %s, bio = %s WHERE email = %s", (firstName +  lastName, bio, email,))
+        cur.execute("UPDATE users SET username = %s, bio = %s WHERE user_id = %s", (firstName +  lastName, bio, user_id,))
+
     conn.commit()
     conn.close()
     return jsonify({
-        "message": "Account updated successfully",
-        "email": email,
-    }), 200
+        "message": "Account updated successfully"}), 200
 
 @main.route("/api/deleteAccount", methods=["POST"])
 def delete_account():
-    data = request.get_json()
-    email = data.get("email")
-    if not email:
-        return jsonify({"message": "Email is required"}), 400
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
 
     conn = get_db_connection()
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE email = %s", (email,))
+        cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
     conn.commit()
     conn.close()
+
     return jsonify({
         "message": "Account deleted successfully",
-        "email": email,
+        "email": user_id,
     }), 200
+
+@main.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+
+    return jsonify({"message": "Logged out"}), 200
