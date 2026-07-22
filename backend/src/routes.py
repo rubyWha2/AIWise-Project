@@ -298,27 +298,72 @@ def login():
 
     conn = get_db_connection()
     with conn.cursor() as cur:
-        cur.execute("SELECT user_id, username, password_hash, role_id FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT user_id, username, password_hash, role_id, failed_attempts, locked_until FROM users WHERE email = %s", (email,))
 
         user = cur.fetchone()
+
+        if user is None:
+            conn.close()
+            return jsonify({"message": "Invalid email or password"}), 401
+
+        user_id = user[0]
+        username = user[1]
+        password_hash = user[2]
+        role_id = user[3]
+        failed_attempts = user[4]
+        locked_until = user[5]
+
+        if locked_until and locked_until > datetime.utcnow():
+            conn.close()
+            return jsonify({"message": "Account locked. Try again later."}), 423
+
+        if not check_password_hash(password_hash, peppered_password):
+            failed_attempts += 1
+            if failed_attempts >= 5:
+                locked_until = datetime.utcnow() + timedelta(minutes=10)
+                cur.execute("UPDATE users SET failed_attempts = %s, locked_until = %s WHERE user_id = %s", (failed_attempts, locked_until, user_id))
+
+                conn.commit()
+                conn.close()
+
+                return jsonify({"message": "Account locked. Try again later."}), 423
+
+
+            cur.execute("""
+                UPDATE users
+                SET failed_attempts = %s
+                WHERE user_id = %s
+            """, (failed_attempts, user_id))
+
+            conn.commit()
+            conn.close()
+            return jsonify({"message": "Invalid email or password"}), 401
+
+
+        session.clear()  # clear a session
+        # new session
+        session["user_id"] = user_id
+        session["username"] = username
+        session["role_id"] = role_id
+
+        session.modified = True
+
+        cur.execute("""
+        UPDATE users
+        SET failed_attempts = 0,
+            locked_until = NULL
+        WHERE user_id = %s
+        """, (user_id,))
+
+        conn.commit()
+
     conn.close()
-    if user is None:
-        return jsonify({"message": "Invalid email or password"}), 401
-
-    if not check_password_hash(user[2], peppered_password):
-        return jsonify({"message": "Invalid email or password"}), 401
-
-    session.clear()  # clear a session
-    #new session
-    session["user_id"] = user[0]
-    session["username"] = user[1]
-    session["role_id"] = user[3]
 
     return jsonify({
         "message": "Login successful",
-        "user_id": user[0],
-        "username": user[1],
-        "role_id": user[3]
+        "user_id": user_id,
+        "username": username,
+        "role_id": role_id,
     }), 200
 
 @main.route("/api/changePassword", methods=["POST"])
@@ -327,7 +372,6 @@ def change_password():
 
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
-
 
     email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     data = request.get_json()
@@ -358,6 +402,7 @@ def change_password():
         return jsonify({"message": "Password must contain a special character"}), 400
 
     conn = get_db_connection()
+
     with conn.cursor() as cur:
         cur.execute("SELECT password_hash FROM users WHERE user_id = %s",(user_id,))
         user = cur.fetchone()
