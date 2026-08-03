@@ -578,8 +578,93 @@ def sendVerificationEmail():
 
 @main.route("/api/verifyEmail", methods=["POST"])
 def verifyEmail():
-    return jsonify({"message": "Verification email sent."}), 200
+    data = request.get_json()
+    token = data.get("token")
 
-@main.route("/api/esendVerificationEmail", methods=["POST"])
+    if not token:
+        return jsonify({"message": "Token is required"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        SELECT user_id
+        FROM users
+        WHERE verification_token = %s
+        
+        """, (token,))
+
+        user = cur.fetchone()
+        if user is None:
+            return jsonify({"message": "Invalid or expired token"}), 400
+
+        cur.execute("""
+        UPDATE users
+        SET verified_email = TRUE,
+            verification_expiry = NULL
+        WHERE user_id = %s
+        """, (user[0],))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Email verification successful."}), 200
+
+@main.route("/api/resendVerificationEmail", methods=["POST"])
 def resendVerificationEmail():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    token = secrets.token_urlsafe(32)
+    verification_link = f"http://localhost:5173/verify-email?token={token}"
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE users
+            SET verification_token = %s
+            WHERE user_id = %s
+        """, (token, user_id))
+
+        cur.execute("""
+            SELECT email, username
+            FROM users
+            WHERE user_id = %s
+        """, (user_id,))
+
+        row = cur.fetchone()
+        if row is None:
+            return jsonify({"message": "User not found"}), 404
+
+        email = row[0]
+        username = row[1]
+
+    conn.commit()
+    conn.close()
+
+
+    msg = Message(
+        subject="Verify your AIWise email",
+        sender=os.getenv("MAIL_USERNAME"),
+        recipients=[email]
+    )
+
+    msg.body = f"""
+    Hello {username},
+
+    Thank you for creating an AIWise account.
+
+    Please verify your email by clicking the link below:
+
+    {verification_link}
+
+    If you did not request this email, you can safely ignore it.
+
+    This link expires in 24 hours.
+
+    The AIWise Team
+    """
+
+    mail.send(msg)
+
     return jsonify({"message": "Verification email resent."}), 200
