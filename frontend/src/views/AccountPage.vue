@@ -88,7 +88,7 @@
       <section v-if="activeTab === 'email verification'" class="card">
         <div class="card-section">
         <div>
-            <button class="btn-verfi" >Verify Email</button>
+            <button class="btn-verfi"type="button" @click="handleVerifyEmail" >Verify Email</button>
             <div class="danger-desc">Email verification for accounts is a security process that ensures a user controls the email address they register with.</div>
         </div>
           <div class="prefs-list">
@@ -274,6 +274,24 @@ async function handleLogout() {
     router.push("/")
   } catch (e) {
     console.error("Logout failed:", e)
+  }
+}
+
+async function handleVerifyEmail() {
+  serverError.value = ''
+  try {
+    const response = await api.post('/sendVerificationEmail', {
+    })
+
+  } catch (e) {
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
+  } finally {
+    loading.value = false
   }
 }
 

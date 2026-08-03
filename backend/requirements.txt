@@ -11,3 +11,5 @@ python-dotenv
 ruff
 psycopg[binary]
 werkzeug.security
+flask_limiter
+Flask-Mail

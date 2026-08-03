@@ -7,13 +7,22 @@ from flask import Blueprint, jsonify, request, current_app, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection
 from dotenv import load_dotenv
+from . import limiter
 import re
 import os
+import secrets
+from . import mail
+from flask_mail import Message
 
 load_dotenv()
-PEPPER = os.getenv("PASSWORD_PEPPER")
+PEPPER = os.getenv("PASSWORD_PEPPER", "")
 
 main = Blueprint('main', __name__)
+
+def login_rate_limit_key():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip().lower()
+    return f"{request.remote_addr}:{email}"
 
 @main.route('/api/test')
 def test():
@@ -238,13 +247,14 @@ def get_users():
     return jsonify(users)
 
 @main.route("/api/register", methods=["POST"])
+@limiter.limit("5 per hour")
 def register():
     email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
 
     data = request.get_json()
     firstName = data.get("firstName")
     lastName = data.get("lastName")
-    email = data.get("email")
+    email = data.get("email", "").strip().lower()
     password = data.get("password")
 
     if not all([firstName, lastName, email, password]):
@@ -267,7 +277,7 @@ def register():
     conn = get_db_connection()
 
     with conn.cursor() as cur:
-        cur.execute("SELECT email FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT email FROM users WHERE LOWER(email) = %s", (email,))
         user = cur.fetchone()
     conn.close()
 
@@ -289,16 +299,21 @@ def register():
     return jsonify({"message": "User registered successfully"}), 201
 
 @main.route("/api/login", methods=["POST"])
+@limiter.limit("7 per minute", key_func=login_rate_limit_key)
 def login():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
-    email = data.get("email")
-    password = data.get("password")
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+
+    if not email or not password:
+        return jsonify({"message": "Email and password are required"}), 400
+
     peppered_password = password + PEPPER
 
     conn = get_db_connection()
     with conn.cursor() as cur:
-        cur.execute("SELECT user_id, username, password_hash, role_id, failed_attempts, locked_until FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT user_id, username, password_hash, role_id, failed_attempts, locked_until FROM users WHERE LOWER(email) = %s", (email,))
 
         user = cur.fetchone()
 
@@ -310,17 +325,20 @@ def login():
         username = user[1]
         password_hash = user[2]
         role_id = user[3]
-        failed_attempts = user[4]
+        failed_attempts = user[4] or 0
         locked_until = user[5]
 
-        if locked_until and locked_until > datetime.utcnow():
+        if locked_until and locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+
+        if locked_until and locked_until > datetime.now(timezone.utc):
             conn.close()
             return jsonify({"message": "Account locked. Try again later."}), 423
 
         if not check_password_hash(password_hash, peppered_password):
             failed_attempts += 1
             if failed_attempts >= 5:
-                locked_until = datetime.utcnow() + timedelta(minutes=10)
+                locked_until = datetime.now(timezone.utc) + timedelta(minutes=10)
                 cur.execute("UPDATE users SET failed_attempts = %s, locked_until = %s WHERE user_id = %s", (failed_attempts, locked_until, user_id))
 
                 conn.commit()
@@ -347,6 +365,7 @@ def login():
         session["role_id"] = role_id
 
         session.modified = True
+        session.permanent = True
 
         cur.execute("""
         UPDATE users
@@ -367,6 +386,7 @@ def login():
     }), 200
 
 @main.route("/api/changePassword", methods=["POST"])
+@limiter.limit("5 per hour")
 def change_password():
     user_id = session.get("user_id")
 
@@ -426,6 +446,7 @@ def change_password():
 
 
 @main.route("/api/updateAccount", methods=["POST"])
+@limiter.limit("20 per minute")
 def update_account():
     user_id = session.get("user_id")
 
@@ -461,6 +482,7 @@ def update_account():
         "message": "Account updated successfully"}), 200
 
 @main.route("/api/deleteAccount", methods=["POST"])
+@limiter.limit("3 per hour")
 def delete_account():
     user_id = session.get("user_id")
 
@@ -483,3 +505,81 @@ def logout():
     session.clear()
 
     return jsonify({"message": "Logged out"}), 200
+
+@main.route("/api/sendVerificationEmail", methods=["POST"])
+def sendVerificationEmail():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    token = secrets.token_urlsafe(32)
+    verification_link = f"http://localhost:5173/verify-email?token={token}"
+    expiry = datetime.utcnow() + timedelta(hours=24)
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+
+        cur.execute(
+            """
+            SELECT email,username
+            FROM users
+            WHERE user_id = %s
+            """,
+            (user_id,)
+        )
+        row = cur.fetchone()
+        if row is None:
+            return jsonify({"message": "User not found"}), 404
+
+        email = row[0]
+        username = row[1]
+
+        cur.execute(
+            """
+            UPDATE users
+            SET verification_token = %s,
+                verification_expiry = %s
+            WHERE user_id = %s
+            """,
+            (token, expiry, user_id)
+        )
+
+    conn.commit()
+    conn.close()
+
+    msg = Message(
+        subject="Verify your AIWise email",
+        sender=os.getenv("MAIL_USERNAME"),
+        recipients=[email]
+    )
+
+    msg.body = f"""
+    Hello {username},
+
+    Thank you for creating an AIWise account.
+
+    Please verify your email by clicking the link below:
+
+    {verification_link}
+
+    If you did not request this email, you can safely ignore it.
+
+    This link expires in 24 hours.
+
+    The AIWise Team
+    """
+
+    mail.send(msg)
+
+    return jsonify({
+        "message": "Verification email sent."
+    }), 200
+
+@main.route("/api/verifyEmail", methods=["POST"])
+def verifyEmail():
+    return jsonify({"message": "Verification email sent."}), 200
+
+@main.route("/api/esendVerificationEmail", methods=["POST"])
+def resendVerificationEmail():
+    return jsonify({"message": "Verification email resent."}), 200

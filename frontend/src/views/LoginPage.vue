@@ -101,7 +101,11 @@ async function handleLogin() {
     router.push('/dashboard')
 
   } catch (e) {
-    serverError.value = 'Invalid email or password.'
+    if (e.response?.status === 429) {
+      serverError.value = 'Too many login attempts. Please wait a minute and try again.'
+    } else {
+      serverError.value = e.response?.data?.message || 'Unable to connect to the server.'
+    }
   } finally {
     loading.value = false
   }
