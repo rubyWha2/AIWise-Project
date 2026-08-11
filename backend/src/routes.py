@@ -9,6 +9,7 @@ from .db import get_db_connection
 from dotenv import load_dotenv
 from . import limiter
 import re
+import requests
 import os
 import secrets
 from . import mail
@@ -23,6 +24,49 @@ def login_rate_limit_key():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
     return f"{request.remote_addr}:{email}"
+
+def verify_recaptcha_token(token, action):
+    secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
+
+    if current_app.debug and not secret_key:
+        return True, "", 200
+
+    if not secret_key:
+        return False, "reCAPTCHA secret key is not configured", 500
+
+    if not token:
+        return False, "Recaptcha token is required", 400
+
+    try:
+        recaptcha_response = requests.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={
+                "secret": secret_key,
+                "response": token
+            },
+            timeout=5
+        )
+        recaptcha_response.raise_for_status()
+    except requests.RequestException:
+        return False, "Could not verify reCAPTCHA. Check the backend internet connection and secret key.", 503
+
+    recaptcha_result = recaptcha_response.json()
+
+    if not recaptcha_result.get("success"):
+        return False, "reCAPTCHA verification failed", 400
+
+    actual_action = recaptcha_result.get("action")
+
+    print("Actual action:", actual_action)
+    print("Expected action:", action)
+
+    if recaptcha_result.get("action") != action:
+        return False, "Invalid reCAPTCHA action", 400
+
+    if recaptcha_result.get("score", 0) < 0.5:
+        return False, "reCAPTCHA verification failed", 403
+
+    return True, "", 200
 
 @main.route('/api/test')
 def test():
@@ -305,6 +349,8 @@ def login():
 
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
+    recaptcha_token = data.get("recaptchaToken")
+
 
     if not email or not password:
         return jsonify({"message": "Email and password are required"}), 400
@@ -358,6 +404,11 @@ def login():
             return jsonify({"message": "Invalid email or password"}), 401
 
 
+        recaptcha_ok, recaptcha_message, recaptcha_status = verify_recaptcha_token(recaptcha_token, "login")
+        if not recaptcha_ok:
+            conn.close()
+            return jsonify({"message": recaptcha_message}), recaptcha_status
+
         session.clear()  # clear a session
         # new session
         session["user_id"] = user_id
@@ -400,6 +451,7 @@ def change_password():
     old_password = data.get("oldPassword")
     new_password = data.get("newPassword")
     confirm_new_password = data.get("confirmPassword")
+    recaptcha_token = data.get("recaptchaToken")
 
     if new_password != confirm_new_password:
         return jsonify({"message": "New passwords must match"}), 401
@@ -435,6 +487,11 @@ def change_password():
 
         peppered_new_password = confirm_new_password + PEPPER
         hashed_password = generate_password_hash(peppered_new_password)
+
+        recaptcha_ok, recaptcha_message, recaptcha_status = verify_recaptcha_token(recaptcha_token, "change_password")
+        if not recaptcha_ok:
+            conn.close()
+            return jsonify({"message": recaptcha_message}), recaptcha_status
 
         cur.execute("UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed_password, user_id,))
 

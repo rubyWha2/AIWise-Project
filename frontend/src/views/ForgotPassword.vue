@@ -27,7 +27,7 @@
             <span v-if="errors.email" class="field-error">{{ errors.email }}</span>
           </div>
 
-          <div class="field" :class="{ 'field--error': errors.password }">
+          <div class="field" :class="{ 'field--error': errors.oldPassword }">
             <label for="password"> Old Password</label>
             <div class="input-wrap">
               <input
@@ -41,16 +41,16 @@
                 {{ showPassword ? 'Hide' : 'Show' }}
               </button>
             </div>
-            <div class="pw-strength" v-if="form.password">
+            <div class="pw-strength" v-if="form.oldPassword">
               <div class="pw-bar" :class="`pw-bar--${pwStrength.level}`">
                 <div class="pw-fill" :style="{ width: pwStrength.pct + '%' }"></div>
               </div>
               <span class="pw-label">{{ pwStrength.label }}</span>
             </div>
-            <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
+            <span v-if="errors.oldPassword" class="field-error">{{ errors.oldPassword }}</span>
           </div>
 
-          <div class="field" :class="{ 'field--error': errors.password }">
+          <div class="field" :class="{ 'field--error': errors.newPassword }">
             <label for="password"> New Password</label>
             <div class="input-wrap">
               <input
@@ -64,16 +64,16 @@
                 {{ showPassword ? 'Hide' : 'Show' }}
               </button>
             </div>
-            <div class="pw-strength" v-if="form.password">
+            <div class="pw-strength" v-if="form.newPassword">
               <div class="pw-bar" :class="`pw-bar--${pwStrength.level}`">
                 <div class="pw-fill" :style="{ width: pwStrength.pct + '%' }"></div>
               </div>
               <span class="pw-label">{{ pwStrength.label }}</span>
             </div>
-            <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
+            <span v-if="errors.newPassword" class="field-error">{{ errors.newPassword }}</span>
           </div>
 
-          <div class="field" :class="{ 'field--error': errors.password }">
+          <div class="field" :class="{ 'field--error': errors.confirmPassword }">
             <label for="password"> Confirm Password</label>
             <div class="input-wrap">
               <input
@@ -87,13 +87,13 @@
                 {{ showPassword ? 'Hide' : 'Show' }}
               </button>
             </div>
-            <div class="pw-strength" v-if="form.password">
+            <div class="pw-strength" v-if="form.confirmPassword">
               <div class="pw-bar" :class="`pw-bar--${pwStrength.level}`">
                 <div class="pw-fill" :style="{ width: pwStrength.pct + '%' }"></div>
               </div>
               <span class="pw-label">{{ pwStrength.label }}</span>
             </div>
-            <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
+            <span v-if="errors.confirmPassword" class="field-error">{{ errors.confirmPassword }}</span>
           </div>
 
           <button type="submit" class="btn-submit" :disabled="loading">
@@ -120,11 +120,13 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { useReCaptcha } from 'vue-recaptcha-v3'
 import { useRouter } from 'vue-router'
 
 import api from '../services/api'
 const router = useRouter()
 const showPassword = ref(false)
+const recaptcha = useReCaptcha()
 const loading = ref(false)
 const serverError = ref('')
 
@@ -134,11 +136,11 @@ const perks = [
   { icon: '📈', title: 'Progress tracking', desc: 'See retention improve week over week.' },
 ]
 
-const form = reactive({oldPassword: '', newPassword: '', confirmPassword: ''})
-const errors = reactive({oldPassword: '', newPassword: '', confirmPassword: '' })
+const form = reactive({ email: '', oldPassword: '', newPassword: '', confirmPassword: '' })
+const errors = reactive({ email: '', oldPassword: '', newPassword: '', confirmPassword: '' })
 
 const pwStrength = computed(() => {
-  const p = form.password
+  const p = form.newPassword
   if (!p) return { level: 'none', pct: 0, label: '' }
   let score = 0
   if (p.length >= 8) score++
@@ -165,46 +167,47 @@ function validate() {
   }
 
   if (!form.oldPassword) {
-    errors.password = 'Password is required.'
+    errors.oldPassword = 'Password is required.'
     valid = false
   }
 
   if (!form.newPassword) {
-    errors.password = 'Password is required.'
+    errors.newPassword = 'Password is required.'
     valid = false
   } else if (form.newPassword.length < 8) {
-    errors.password = 'Must be at least 8 characters.'
+    errors.newPassword = 'Must be at least 8 characters.'
     valid = false
   } else if (form.newPassword.length > 28) {
-    errors.password = 'Must be less than 28 characters.'
+    errors.newPassword = 'Must be less than 28 characters.'
     valid = false
   } else if (
     !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*()]).{8,28}/.test(form.newPassword)
   ) {
-    errors.password =
+    errors.newPassword =
       'Must contain uppercase, lowercase, number and special character.'
     valid = false
   }
 
   if (!form.confirmPassword) {
-    errors.password = 'Password is required.'
+    errors.confirmPassword = 'Password is required.'
     valid = false
   } else if (form.confirmPassword.length < 8) {
-    errors.password = 'Must be at least 8 characters.'
+    errors.confirmPassword = 'Must be at least 8 characters.'
     valid = false
   } else if (form.confirmPassword.length > 28) {
-    errors.password = 'Must be less than 28 characters.'
+    errors.confirmPassword = 'Must be less than 28 characters.'
     valid = false
   } else if (
     !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*()]).{8,28}/.test(form.confirmPassword)
   ) {
-    errors.password =
+    errors.confirmPassword =
       'Must contain uppercase, lowercase, number and special character.'
     valid = false
   }
 
   if (form.newPassword !== form.confirmPassword) {
     errors.confirmPassword = "Passwords do not match."
+    valid = false
   }
 
   return valid
@@ -215,11 +218,23 @@ async function handleReset() {
   loading.value = true
   serverError.value = ''
   try {
+    let token = ''
+
+    if (recaptcha) {
+      try {
+        await recaptcha.recaptchaLoaded()
+        token = await recaptcha.executeRecaptcha('change_password')
+      } catch (recaptchaError) {
+        console.warn('reCAPTCHA could not create a token:', recaptchaError)
+      }
+    }
+
     const response = await api.post('/changePassword', {
       email: form.email,
       oldPassword: form.oldPassword,
       newPassword: form.newPassword,
-      confirmPassword: form.confirmPassword
+      confirmPassword: form.confirmPassword,
+      recaptchaToken: token
     })
     console.log(response.data)
 
