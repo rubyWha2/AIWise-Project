@@ -29,7 +29,7 @@
     <main class="main">
       <header class="page-header">
         <h1>Articles</h1>
-        <p class="header-sub">Read an article, then test your knowledge.</p>
+        <p class="header-sub">Read an article, then test your knowledge. If no articles are loading please press All button to load all articles.</p>
       </header>
 
       <div class="filters">
@@ -58,7 +58,7 @@
             <span class="article-tag">{{ article.category }}</span>
           </div>
           <h2 class="article-title">{{ article.title }}</h2>
-          <p class="article-excerpt">{{ article.content?.substring(0, 180) || 'Open this article to read more.' }}</p>
+          <p class="article-excerpt" v-html="article.content?.substring(0, 180) || 'Open this article to read more.'"></p>
           <div class="article-footer">
             <router-link
                 :to="`/article/${article.article_id}`"
