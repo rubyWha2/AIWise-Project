@@ -17,10 +17,10 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="user-card">
-          <div class="avatar">AR</div>
+          <div class="avatar">AI</div>
           <div>
-            <div class="user-name">Tyler Durden</div>
-            <div class="user-email">tyler@PaperStreetSoapCo.com</div>
+            <div class="user-name">{{ loadDetails.username }}</div>
+            <div class="user-email">{{ loadDetails.email }}</div>
           </div>
         </div>
         <button class="logout-btn" type="button" @click="handleLogout">Log out</button>
@@ -175,10 +175,9 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
-
 
 const router = useRouter()
 const activeTab = ref('profile')
@@ -199,10 +198,21 @@ const tabs = [
   { key: 'danger', label: 'Danger zone' },
 ]
 
+const loadDetails = ref([])
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/loadDetails')
+        loadDetails.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
+    }
+})
+
 const profile = reactive({
   firstName: 'Alex',
   lastName: 'Rivera',
-  email: 'alex@example.com',
+  email: loadDetails.value,
   bio: '',
 })
 

@@ -19,8 +19,8 @@
         <div class="user-card">
           <div class="avatar">AR</div>
           <div>
-            <div class="user-name">Alex Rivera</div>
-            <div class="user-email">alex@example.com</div>
+            <div class="user-name">{{ loadDetails.username }}</div>
+            <div class="user-email">{{ loadDetails.email }}</div>
           </div>
         </div>
       </div>
@@ -94,6 +94,20 @@ onMounted(async () => {
         articles.value = response.data
     } catch (error) {
         console.error('Failed to load articles:', error)
+    }
+})
+
+const loadDetails = ref({
+  username: '',
+  email: ''
+})
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/loadDetails')
+        loadDetails.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
     }
 })
 

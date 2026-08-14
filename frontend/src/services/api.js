@@ -5,4 +5,3 @@ export default axios.create({
     withCredentials: true
 });
 
-export default api

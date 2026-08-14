@@ -17,10 +17,10 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="user-card">
-          <div class="avatar">AR</div>
+          <div class="avatar">AI</div>
           <div>
-            <div class="user-name">Alex Rivera</div>
-            <div class="user-email">alex@example.com</div>
+            <div class="user-name">{{ loadDetails.username }}</div>
+            <div class="user-email">{{ loadDetails.email }}</div>
           </div>
         </div>
       </div>
@@ -79,6 +79,9 @@
 </template>
 
 <script setup>
+import { ref, reactive, onMounted } from 'vue'
+import api from '../services/api'
+
 const stats = [
   { label: 'Quizzes taken', value: '47', change: '+5 this week', up: true },
   { label: 'Avg. score', value: '82%', change: '+4% vs last week', up: true },
@@ -99,6 +102,17 @@ const suggestions = [
   { tag: 'History', title: 'The Fall of Constantinople', readTime: 9 },
   { tag: 'Technology', title: 'How Large Language Models Work', readTime: 8 },
 ]
+
+const loadDetails = ref([])
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/loadDetails')
+        loadDetails.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
+    }
+})
 </script>
 
 <style scoped>

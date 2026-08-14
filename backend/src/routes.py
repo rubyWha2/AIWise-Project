@@ -726,7 +726,6 @@ def resendVerificationEmail():
 
     return jsonify({"message": "Verification email resent."}), 200
 
-
 @main.route("/api/updateResults", methods=["POST"])
 def updateResults():
     user_id = session.get("user_id")
@@ -739,7 +738,7 @@ def updateResults():
     max_score = data.get("max_score")
     created_at = datetime.now(timezone.utc)
 
-    if not article_id or not score or not max_score:
+    if article_id is None or score is None or max_score is None:
         return jsonify({"message": "Quiz data is missing"}), 400
 
     conn = get_db_connection()
@@ -750,7 +749,33 @@ def updateResults():
         VALUES (%s, %s, %s, %s, %s)
         """,(user_id, article_id, score, max_score, created_at))
 
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
-        return jsonify({"message": "Result successfully written to database."}), 200
+    return jsonify({"message": "Result successfully written to database."}), 200
+
+@main.route("/api/loadDetails", methods=["GET"])
+def loadDetails():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "No user found."}), 401
+
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        SELECT username,email
+        FROM users
+        WHERE user_id = %s
+        """,(user_id,))
+        row = cur.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return jsonify({"message": "User not found."}), 404
+
+    return jsonify({
+        "username": row[0],
+        "email": row[1]
+    }), 200
