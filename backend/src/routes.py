@@ -725,3 +725,32 @@ def resendVerificationEmail():
     mail.send(msg)
 
     return jsonify({"message": "Verification email resent."}), 200
+
+
+@main.route("/api/updateResults", methods=["POST"])
+def updateResults():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    data = request.get_json()
+    article_id = data.get("article_id")
+    score = data.get("score")
+    max_score = data.get("max_score")
+    created_at = datetime.now(timezone.utc)
+
+    if not article_id or not score or not max_score:
+        return jsonify({"message": "Quiz data is missing"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        INSERT INTO results 
+        (user_id, article_id, score, max_score, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        """,(user_id, article_id, score, max_score, created_at))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Result successfully written to database."}), 200

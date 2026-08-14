@@ -57,12 +57,18 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import api from '../services/api'
 
 const route = useRoute()
 
 const correct = computed(() => Number(route.query.correct ?? 0))
 const total = computed(() => Number(route.query.maxScore ?? 0))
-const timeSpent = computed(() => parseInt(route.query.avgTime ?? 18))
+const totalTime = computed(() => Number(route.query.totalTime ?? 0))
+
+const timeSpent = computed(() => {
+  if (total.value === 0) return 0
+  return Math.round(totalTime.value / total.value)
+})
 
 const scorePercent = computed(() => Math.round((correct.value / total.value) * 100))
 const circumference = 2 * Math.PI * 52
