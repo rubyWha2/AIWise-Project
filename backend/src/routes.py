@@ -779,3 +779,48 @@ def loadDetails():
         "username": row[0],
         "email": row[1]
     }), 200
+
+@main.route("/api/loadResults", methods=["GET"])
+def loadResults():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "No user found."}), 401
+
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        SELECT 
+            r.result_id,
+            r.user_id,
+            r.score,
+            r.max_score,
+            r.created_at,
+            r.article_id,
+            a.title
+        FROM results r
+        JOIN articles a ON r.article_id = a.article_id
+        WHERE r.user_id = %s
+        ORDER BY r.created_at DESC
+        """,(user_id,))
+        rows = cur.fetchall()
+        print(rows)
+
+    conn.close()
+
+    if rows is None:
+        return jsonify({"message": "User not found."}), 404
+
+    results = []
+    for row in rows:
+        results.append({
+            "result_id": row[0],
+            "user_id": row[1],
+            "score": row[2],
+            "max_score": row[3],
+            "created_at": row[4],
+            "article_id": row[5],
+            "article_title": row[6]
+        })
+    return jsonify(results), 200
+
