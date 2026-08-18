@@ -4,9 +4,69 @@ API routes: auth, user management and data endpoints
 
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request, current_app, session
+from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection
+from dotenv import load_dotenv
+from . import limiter
+import re
+import requests
+import os
+import secrets
+from . import mail
+from flask_mail import Message
+
+load_dotenv()
+PEPPER = os.getenv("PASSWORD_PEPPER", "")
 
 main = Blueprint('main', __name__)
+
+def login_rate_limit_key():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip().lower()
+    return f"{request.remote_addr}:{email}"
+
+def verify_recaptcha_token(token, action):
+    secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
+
+    if current_app.debug and not secret_key:
+        return True, "", 200
+
+    if not secret_key:
+        return False, "reCAPTCHA secret key is not configured", 500
+
+    if not token:
+        return False, "Recaptcha token is required", 400
+
+    try:
+        recaptcha_response = requests.post(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data={
+                "secret": secret_key,
+                "response": token
+            },
+            timeout=5
+        )
+        recaptcha_response.raise_for_status()
+    except requests.RequestException:
+        return False, "Could not verify reCAPTCHA. Check the backend internet connection and secret key.", 503
+
+    recaptcha_result = recaptcha_response.json()
+
+    if not recaptcha_result.get("success"):
+        return False, "reCAPTCHA verification failed", 400
+
+    actual_action = recaptcha_result.get("action")
+
+    print("Actual action:", actual_action)
+    print("Expected action:", action)
+
+    if recaptcha_result.get("action") != action:
+        return False, "Invalid reCAPTCHA action", 400
+
+    if recaptcha_result.get("score", 0) < 0.5:
+        return False, "reCAPTCHA verification failed", 403
+
+    return True, "", 200
 
 @main.route('/api/test')
 def test():
@@ -229,3 +289,538 @@ def get_users():
         })
 
     return jsonify(users)
+
+@main.route("/api/register", methods=["POST"])
+@limiter.limit("5 per hour")
+def register():
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+
+    data = request.get_json()
+    firstName = data.get("firstName")
+    lastName = data.get("lastName")
+    email = data.get("email", "").strip().lower()
+    password = data.get("password")
+
+    if not all([firstName, lastName, email, password]):
+        return jsonify({"message": "Missing required fields"}), 400
+    if not re.match(email_regex, email):
+        return jsonify({"message": "Invalid email format"}), 400
+    if len(password) < 8:
+        return jsonify({"message": "Password must be at least 8 characters long"}), 400
+    if len(password) > 28:
+        return jsonify({"message": "Password must be at most 28 characters long"}), 400
+    if not re.search(r"[A-Z]", password):
+        return jsonify({"message": "Password must contain an uppercase letter"}), 400
+    if not re.search(r"[a-z]", password):
+        return jsonify({"message": "Password must contain a lowercase letter"}), 400
+    if not re.search(r"\d", password):
+        return jsonify({"message": "Password must contain a number"}), 400
+    if not re.search(r"[!@#$%^&*()]", password):
+        return jsonify({"message": "Password must contain a special character"}), 400
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT email FROM users WHERE LOWER(email) = %s", (email,))
+        user = cur.fetchone()
+    conn.close()
+
+    if user is not None:
+        return jsonify({"message": "Email already exists"}), 400
+
+
+    peppered_password = password + PEPPER
+    hashed_password = generate_password_hash(peppered_password)
+    created_date = datetime.now(timezone.utc)
+    role_id = 2 #automatically a user role
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO users (username, email, password_hash, role_id, created_at) VALUES (%s, %s, %s, %s, %s)", (firstName +  lastName, email, hashed_password, role_id, created_date))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "User registered successfully"}), 201
+
+@main.route("/api/login", methods=["POST"])
+@limiter.limit("7 per minute", key_func=login_rate_limit_key)
+def login():
+    data = request.get_json(silent=True) or {}
+
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    recaptcha_token = data.get("recaptchaToken")
+
+
+    if not email or not password:
+        return jsonify({"message": "Email and password are required"}), 400
+
+    peppered_password = password + PEPPER
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id, username, password_hash, role_id, failed_attempts, locked_until FROM users WHERE LOWER(email) = %s", (email,))
+
+        user = cur.fetchone()
+
+        if user is None:
+            conn.close()
+            return jsonify({"message": "Invalid email or password"}), 401
+
+        user_id = user[0]
+        username = user[1]
+        password_hash = user[2]
+        role_id = user[3]
+        failed_attempts = user[4] or 0
+        locked_until = user[5]
+
+        if locked_until and locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
+
+        if locked_until and locked_until > datetime.now(timezone.utc):
+            conn.close()
+            return jsonify({"message": "Account locked. Try again later."}), 423
+
+        if not check_password_hash(password_hash, peppered_password):
+            failed_attempts += 1
+            if failed_attempts >= 5:
+                locked_until = datetime.now(timezone.utc) + timedelta(minutes=10)
+                cur.execute("UPDATE users SET failed_attempts = %s, locked_until = %s WHERE user_id = %s", (failed_attempts, locked_until, user_id))
+
+                conn.commit()
+                conn.close()
+
+                return jsonify({"message": "Account locked. Try again later."}), 423
+
+
+            cur.execute("""
+                UPDATE users
+                SET failed_attempts = %s
+                WHERE user_id = %s
+            """, (failed_attempts, user_id))
+
+            conn.commit()
+            conn.close()
+            return jsonify({"message": "Invalid email or password"}), 401
+
+
+        recaptcha_ok, recaptcha_message, recaptcha_status = verify_recaptcha_token(recaptcha_token, "login")
+        if not recaptcha_ok:
+            conn.close()
+            return jsonify({"message": recaptcha_message}), recaptcha_status
+
+        session.clear()  # clear a session
+        # new session
+        session["user_id"] = user_id
+        session["username"] = username
+        session["role_id"] = role_id
+
+        session.modified = True
+        session.permanent = True
+
+        cur.execute("""
+        UPDATE users
+        SET failed_attempts = 0,
+            locked_until = NULL
+        WHERE user_id = %s
+        """, (user_id,))
+
+        conn.commit()
+
+    conn.close()
+
+    return jsonify({
+        "message": "Login successful",
+        "user_id": user_id,
+        "username": username,
+        "role_id": role_id,
+    }), 200
+
+@main.route("/api/changePassword", methods=["POST"])
+@limiter.limit("5 per hour")
+def change_password():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    data = request.get_json()
+
+    email = data.get("email")
+    old_password = data.get("oldPassword")
+    new_password = data.get("newPassword")
+    confirm_new_password = data.get("confirmPassword")
+    recaptcha_token = data.get("recaptchaToken")
+
+    if new_password != confirm_new_password:
+        return jsonify({"message": "New passwords must match"}), 401
+
+    if not all([email, old_password, new_password, confirm_new_password]):
+        return jsonify({"message": "Missing required fields"}), 400
+    if not re.match(email_regex, email):
+        return jsonify({"message": "Invalid email format"}), 400
+    if len(confirm_new_password) < 8:
+        return jsonify({"message": "Password must be at least 8 characters long"}), 400
+    if len(confirm_new_password) > 28:
+        return jsonify({"message": "Password must be at most 28 characters long"}), 400
+    if not re.search(r"[A-Z]", confirm_new_password):
+        return jsonify({"message": "Password must contain an uppercase letter"}), 400
+    if not re.search(r"[a-z]", confirm_new_password):
+        return jsonify({"message": "Password must contain a lowercase letter"}), 400
+    if not re.search(r"\d", confirm_new_password):
+        return jsonify({"message": "Password must contain a number"}), 400
+    if not re.search(r"[!@#$%^&*()]", confirm_new_password):
+        return jsonify({"message": "Password must contain a special character"}), 400
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT password_hash FROM users WHERE user_id = %s",(user_id,))
+        user = cur.fetchone()
+
+        if user is None:
+            return jsonify({"message": "User does not exist"}), 401
+
+        if not check_password_hash(user[0], old_password+PEPPER):
+            return jsonify({"message": "Old password is incorrect"}), 401
+
+        peppered_new_password = confirm_new_password + PEPPER
+        hashed_password = generate_password_hash(peppered_new_password)
+
+        recaptcha_ok, recaptcha_message, recaptcha_status = verify_recaptcha_token(recaptcha_token, "change_password")
+        if not recaptcha_ok:
+            conn.close()
+            return jsonify({"message": recaptcha_message}), recaptcha_status
+
+        cur.execute("UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed_password, user_id,))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Password changed successfully"}), 200
+
+
+
+@main.route("/api/updateAccount", methods=["POST"])
+@limiter.limit("20 per minute")
+def update_account():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        print(session)
+        print(session.get("user_id"))
+        return jsonify({"message": "Please log in"}), 401
+
+    data = request.get_json()
+
+    #email = data.get("email")
+    firstName = data.get("firstName")
+    lastName = data.get("lastName")
+    bio = data.get("bio")
+
+    if not all([firstName, lastName, bio]):
+        return jsonify({"message": "Missing required fields"}), 400
+
+    if len(bio) > 255:
+        return jsonify({"message": "Bio must be at most 255 characters long"}), 400
+    if len(firstName) > 50:
+        return jsonify({"message": "First name must be at most 50 characters long"}), 400
+    if len(lastName) > 50:
+        return jsonify({"message": "Last name must be at most 50 characters long"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET username = %s, bio = %s WHERE user_id = %s", (firstName +  lastName, bio, user_id,))
+
+    conn.commit()
+    conn.close()
+    return jsonify({
+        "message": "Account updated successfully"}), 200
+
+@main.route("/api/deleteAccount", methods=["POST"])
+@limiter.limit("3 per hour")
+def delete_account():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Account deleted successfully",
+        "email": user_id,
+    }), 200
+
+@main.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+
+    return jsonify({"message": "Logged out"}), 200
+
+@main.route("/api/sendVerificationEmail", methods=["POST"])
+def sendVerificationEmail():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    token = secrets.token_urlsafe(32)
+    verification_link = f"http://localhost:5173/verify-email?token={token}"
+    expiry = datetime.utcnow() + timedelta(hours=24)
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+
+        cur.execute(
+            """
+            SELECT email,username
+            FROM users
+            WHERE user_id = %s
+            """,
+            (user_id,)
+        )
+        row = cur.fetchone()
+        if row is None:
+            return jsonify({"message": "User not found"}), 404
+
+        email = row[0]
+        username = row[1]
+
+        cur.execute(
+            """
+            UPDATE users
+            SET verification_token = %s,
+                verification_expiry = %s
+            WHERE user_id = %s
+            """,
+            (token, expiry, user_id)
+        )
+
+    conn.commit()
+    conn.close()
+
+    msg = Message(
+        subject="Verify your AIWise email",
+        sender=os.getenv("MAIL_USERNAME"),
+        recipients=[email]
+    )
+
+    msg.body = f"""
+    Hello {username},
+
+    Thank you for creating an AIWise account.
+
+    Please verify your email by clicking the link below:
+
+    {verification_link}
+
+    If you did not request this email, you can safely ignore it.
+
+    This link expires in 24 hours.
+
+    The AIWise Team
+    """
+
+    mail.send(msg)
+
+    return jsonify({
+        "message": "Verification email sent."
+    }), 200
+
+@main.route("/api/verifyEmail", methods=["POST"])
+def verifyEmail():
+    data = request.get_json()
+    token = data.get("token")
+
+    if not token:
+        return jsonify({"message": "Token is required"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        SELECT user_id
+        FROM users
+        WHERE verification_token = %s
+        
+        """, (token,))
+
+        user = cur.fetchone()
+        if user is None:
+            return jsonify({"message": "Invalid or expired token"}), 400
+
+        cur.execute("""
+        UPDATE users
+        SET verified_email = TRUE,
+            verification_expiry = NULL
+        WHERE user_id = %s
+        """, (user[0],))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Email verification successful."}), 200
+
+@main.route("/api/resendVerificationEmail", methods=["POST"])
+def resendVerificationEmail():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    token = secrets.token_urlsafe(32)
+    verification_link = f"http://localhost:5173/verify-email?token={token}"
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE users
+            SET verification_token = %s
+            WHERE user_id = %s
+        """, (token, user_id))
+
+        cur.execute("""
+            SELECT email, username
+            FROM users
+            WHERE user_id = %s
+        """, (user_id,))
+
+        row = cur.fetchone()
+        if row is None:
+            return jsonify({"message": "User not found"}), 404
+
+        email = row[0]
+        username = row[1]
+
+    conn.commit()
+    conn.close()
+
+
+    msg = Message(
+        subject="Verify your AIWise email",
+        sender=os.getenv("MAIL_USERNAME"),
+        recipients=[email]
+    )
+
+    msg.body = f"""
+    Hello {username},
+
+    Thank you for creating an AIWise account.
+
+    Please verify your email by clicking the link below:
+
+    {verification_link}
+
+    If you did not request this email, you can safely ignore it.
+
+    This link expires in 24 hours.
+
+    The AIWise Team
+    """
+
+    mail.send(msg)
+
+    return jsonify({"message": "Verification email resent."}), 200
+
+@main.route("/api/updateResults", methods=["POST"])
+def updateResults():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    data = request.get_json()
+    article_id = data.get("article_id")
+    score = data.get("score")
+    max_score = data.get("max_score")
+    created_at = datetime.now(timezone.utc)
+
+    if article_id is None or score is None or max_score is None:
+        return jsonify({"message": "Quiz data is missing"}), 400
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        INSERT INTO results 
+        (user_id, article_id, score, max_score, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        """,(user_id, article_id, score, max_score, created_at))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Result successfully written to database."}), 200
+
+@main.route("/api/loadDetails", methods=["GET"])
+def loadDetails():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "No user found."}), 401
+
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        SELECT username,email
+        FROM users
+        WHERE user_id = %s
+        """,(user_id,))
+        row = cur.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return jsonify({"message": "User not found."}), 404
+
+    return jsonify({
+        "username": row[0],
+        "email": row[1]
+    }), 200
+
+@main.route("/api/loadResults", methods=["GET"])
+def loadResults():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"message": "No user found."}), 401
+
+
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute("""
+        SELECT 
+            r.result_id,
+            r.user_id,
+            r.score,
+            r.max_score,
+            r.created_at,
+            r.article_id,
+            a.title
+        FROM results r
+        JOIN articles a ON r.article_id = a.article_id
+        WHERE r.user_id = %s
+        ORDER BY r.created_at DESC
+        """,(user_id,))
+        rows = cur.fetchall()
+        print(rows)
+
+    conn.close()
+
+    if rows is None:
+        return jsonify({"message": "User not found."}), 404
+
+    results = []
+    for row in rows:
+        results.append({
+            "result_id": row[0],
+            "user_id": row[1],
+            "score": row[2],
+            "max_score": row[3],
+            "created_at": row[4],
+            "article_id": row[5],
+            "article_title": row[6]
+        })
+    return jsonify(results), 200
+

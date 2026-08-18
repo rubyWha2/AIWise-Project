@@ -76,10 +76,10 @@ const router = useRouter()
 const route = useRoute()
 const questions = ref([])
 
+const articleId = route.query.articleId
+
 onMounted(async () => {
   try {
-    const articleId = route.query.articleId
-
     const response = await api.get(`/quiz/${articleId}`)
 
     questions.value = response.data
@@ -104,6 +104,7 @@ const scores = ref([])
 const finished = ref(false)
 const timeLeft = ref(30)
 let timer = null
+const totalTime = ref(0)
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const progressPct = computed(() =>
@@ -121,6 +122,8 @@ function startTimer() {
   timeLeft.value = 30
   timer = setInterval(() => {
     timeLeft.value--
+    totalTime.value++
+
     if (timeLeft.value <= 0) {
       clearInterval(timer)
       if (!answered.value) {
@@ -156,7 +159,7 @@ function optionClass(letter) {
   return 'option--dim'
 }
 
-function nextQuestion() {
+async function nextQuestion() {
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
     selectedAnswer.value = null
@@ -164,10 +167,33 @@ function nextQuestion() {
     startTimer()
   } else {
     finished.value = true
-    router.push({ name: 'Summary', query: { correct: score.value, maxScore: maxScore.value } })
+    await finishQuiz()
   }
 }
 
+async function finishQuiz() {
+  try {
+    const response = await api.post('/updateResults', {
+      article_id: articleId,
+      score: score.value,
+      max_score: maxScore.value
+    })
+
+    console.log('Result saved:', response.data)
+
+    router.push({
+      name: 'Summary',
+      query: {
+        correct: score.value,
+        maxScore: maxScore.value,
+        articleId: articleId
+      }
+    })
+
+  } catch (e) {
+    console.error('Failed to save result:', e)
+  }
+}
 onMounted(startTimer)
 onUnmounted(() => clearInterval(timer))
 </script>

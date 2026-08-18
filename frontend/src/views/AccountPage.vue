@@ -17,10 +17,10 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="user-card">
-          <div class="avatar">AR</div>
+          <div class="avatar">AI</div>
           <div>
-            <div class="user-name">Alex Rivera</div>
-            <div class="user-email">alex@example.com</div>
+            <div class="user-name">{{ loadDetails.username }}</div>
+            <div class="user-email">{{ loadDetails.email }}</div>
           </div>
         </div>
         <button class="logout-btn" type="button" @click="handleLogout">Log out</button>
@@ -47,29 +47,24 @@
       <section v-if="activeTab === 'profile'" class="card">
         <div class="card-section">
           <h2>Profile information</h2>
-          <div class="avatar-row">
-            <div class="avatar-lg">AR</div>
-            <div>
-              <button class="btn-outline btn-sm">Upload photo</button>
-              <p class="hint">JPG or PNG, max 2 MB.</p>
-            </div>
-          </div>
-          <form @submit.prevent="saveProfile" class="form-grid">
+          <h3>Please complete all fields to update profile details.</h3>
+          <div style="height: 20px;"></div>
+          <form @submit.prevent="handleUpdateAccount" class="form-grid">
             <div class="field">
               <label>First name</label>
-              <input v-model="profile.firstName" type="text" />
+              <input v-model="updateForm.firstName" type="text" />
             </div>
             <div class="field">
               <label>Last name</label>
-              <input v-model="profile.lastName" type="text" />
+              <input v-model="updateForm.lastName" type="text" />
             </div>
             <div class="field field--full">
               <label>Email</label>
-              <input v-model="profile.email" type="email" />
+              <input v-model="updateForm.email" type="email" />
             </div>
             <div class="field field--full">
               <label>Bio <span class="optional">(optional)</span></label>
-              <textarea v-model="profile.bio" rows="3" placeholder="Tell us a bit about yourself…"></textarea>
+              <textarea v-model="updateForm.bio" rows="3" placeholder="Tell us a bit about yourself…"></textarea>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn-primary">Save changes</button>
@@ -82,34 +77,20 @@
       <!-- Password -->
       <section v-if="activeTab === 'password'" class="card">
         <div class="card-section">
-          <h2>Change password</h2>
-          <form @submit.prevent="savePassword" class="form-grid">
-            <div class="field field--full">
-              <label>Current password</label>
-              <input v-model="pw.current" type="password" placeholder="••••••••" />
-            </div>
-            <div class="field field--full">
-              <label>New password</label>
-              <input v-model="pw.next" type="password" placeholder="At least 8 characters" />
-            </div>
-            <div class="field field--full">
-              <label>Confirm new password</label>
-              <input v-model="pw.confirm" type="password" placeholder="••••••••" />
-              <span v-if="pw.next && pw.confirm && pw.next !== pw.confirm" class="field-error">
-                Passwords don't match.
-              </span>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Update password</button>
-            </div>
-          </form>
+          <h2>Need to update your password? No worries, click the button below.</h2>
+            <router-link to="/forgot-password" class="btn-reset-password">
+                Change Password
+            </router-link>
         </div>
       </section>
 
-      <!-- Preferences -->
-      <section v-if="activeTab === 'preferences'" class="card">
+      <!-- Email Preferences -->
+      <section v-if="activeTab === 'email verification'" class="card">
         <div class="card-section">
-          <h2>Preferences</h2>
+        <div>
+            <button class="btn-verfi"type="button" @click="handleVerifyEmail" >Verify Email</button>
+            <div class="danger-desc">Email verification for accounts is a security process that ensures a user controls the email address they register with.</div>
+        </div>
           <div class="prefs-list">
             <div class="pref-row" v-for="pref in prefs" :key="pref.key">
               <div class="pref-info">
@@ -145,49 +126,101 @@
 
       <!-- Delete confirmation modal -->
       <div class="modal-backdrop" v-if="confirmDelete" @click.self="confirmDelete = false">
-        <div class="modal">
-          <h2>Are you absolutely sure?</h2>
-          <p>This will permanently delete your account, all quiz history, and your progress. There is no going back.</p>
-          <div class="modal-actions">
-            <button class="btn-outline" @click="confirmDelete = false">Cancel</button>
-            <button class="btn-danger">Yes, delete my account</button>
+       <div class="modal">
+        <h2>Delete Account</h2>
+
+        <p>
+            Enter your email to permanently delete your account.
+        </p>
+
+        <form @submit.prevent="handleDeleteAccount">
+
+          <div class="field">
+            <label>Email</label>
+            <input
+              v-model="deleteForm.email"
+              type="email"
+              required
+            />
           </div>
-        </div>
-      </div>
+
+          <div style="height: 20px;"></div>
+
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-outline"
+              @click="confirmDelete = false"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              class="btn-danger"
+            >
+              Delete Account
+            </button>
+          </div>
+
+          <p v-if="serverError" class="field-error">
+            {{ serverError }}
+          </p>
+
+        </form>
+    </div>
+    </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../services/api'
 
 const router = useRouter()
 const activeTab = ref('profile')
 const profileSaved = ref(false)
 const confirmDelete = ref(false)
+const loading = ref(false)
+const serverError = ref('')
+
+const deleteForm = reactive({ email: ''})
+const updateForm = reactive({ firstName: '', lastName: '', email: '', bio: ''})
+const errors = reactive({  email: '' })
+
 
 const tabs = [
   { key: 'profile', label: 'Profile' },
   { key: 'password', label: 'Password' },
-  { key: 'preferences', label: 'Preferences' },
+  { key: 'email verification', label: 'Email verification' },
   { key: 'danger', label: 'Danger zone' },
 ]
+
+const loadDetails = ref([])
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/loadDetails')
+        loadDetails.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
+    }
+})
 
 const profile = reactive({
   firstName: 'Alex',
   lastName: 'Rivera',
-  email: 'alex@example.com',
+  email: loadDetails.value,
   bio: '',
 })
 
 const pw = reactive({ current: '', next: '', confirm: '' })
 
 const prefs = reactive([
-  { key: 'emailDigest', label: 'Weekly email digest', desc: 'Receive a summary of new articles every Monday.', value: true },
   { key: 'quizReminders', label: 'Quiz reminders', desc: 'Get notified when you have uncompleted quizzes.', value: false },
-  { key: 'streakAlerts', label: 'Streak alerts', desc: "We'll warn you before your daily streak breaks.", value: true },
-  { key: 'publicProfile', label: 'Public profile', desc: 'Let other users see your stats and progress.', value: false },
+  { key: '2StepVerification', label: 'Enable  2-Step Verification', desc: "Add an extra layer of security by requiring a password and security question", value: true }
 ])
 
 function saveProfile() {
@@ -195,16 +228,144 @@ function saveProfile() {
   setTimeout(() => { profileSaved.value = false }, 3000)
 }
 
-function savePassword() {
-  pw.current = ''
-  pw.next = ''
-  pw.confirm = ''
+function validateUpdate() {
+  let valid = true
+
+  Object.keys(errors).forEach(k => errors[k] = '')
+
+  if (!updateForm.email) {
+    serverError.value = 'Email is required.'
+    valid = false
+  } else if (!/\S+@\S+\.\S+/.test(updateForm.email)) {
+    errors.email = 'Enter a valid email.'
+    valid = false
+  }
+  if (!updateForm.firstName) {
+    errors.firstName = 'Required.'
+    valid = false
+  }
+
+  if (!updateForm.lastName) {
+    errors.lastName = 'Required.'
+    valid = false
+  }
+
+  if (!updateForm.lastName) {
+    errors.lastName = 'Required.'
+    valid = false
+  }
+
+  return valid
 }
 
-function handleLogout() {
-  localStorage.clear()
-  sessionStorage.clear()
-  router.push('/')
+function validateEmail() {
+  let valid = true
+
+  Object.keys(errors).forEach(k => errors[k] = '')
+
+  if (!deleteForm.email) {
+    errors.email = 'Email is required.'
+    valid = false
+  } else if (!/\S+@\S+\.\S+/.test(deleteForm.email)) {
+    errors.email = 'Enter a valid email.'
+    valid = false
+  }
+
+  return valid
+}
+
+async function handleLogout() {
+  try {
+  await api.post("/logout")
+
+    localStorage.clear()
+    sessionStorage.clear()
+
+    router.push("/")
+  } catch (e) {
+    console.error("Logout failed:", e)
+  }
+}
+
+async function handleVerifyEmail() {
+  serverError.value = ''
+  try {
+    const response = await api.post('/sendVerificationEmail', {
+    })
+
+  } catch (e) {
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleDeleteAccount() {
+  console.log("Delete function called");
+  if (!validateEmail()) return
+  loading.value = true
+  serverError.value = ''
+  try {
+    const response = await api.post('/deleteAccount', {
+    })
+    console.log(response.data)
+
+    // Clear the form
+    deleteForm.email = ''
+
+    router.push('/login')
+
+  } catch (e) {
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleUpdateAccount() {
+  if (!validateUpdate()) return
+  loading.value = true
+  serverError.value = ''
+  try {
+    const response = await api.post('/updateAccount', {
+      firstName: updateForm.firstName,
+      lastName: updateForm.lastName,
+      bio: updateForm.bio
+    })
+    console.log(response.data)
+
+    // Clear the form
+    updateForm.firstName = ''
+    updateForm.lastName = ''
+    updateForm.email = ''
+    updateForm.bio = ''
+
+    profileSaved.value = true
+
+    setTimeout(() => {
+        profileSaved.value = false
+    }, 3000)
+
+  } catch (e) {
+    console.log(e)
+    if (e.response) {
+      serverError.value = e.response.data.message
+    } else {
+      serverError.value = 'Unable to connect to the server.'
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -316,6 +477,19 @@ function handleLogout() {
 }
 .btn-danger:hover { background: #b91c1c; }
 .saved-msg { font-size: 13px; color: #10b981; font-weight: 600; }
+.btn-reset-password {
+  display: inline-block;
+  padding: 12px 20px;
+  background: #3730a3;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.btn-reset-password:hover {
+  background: #312e81;
+}
 
 /* Preferences */
 .prefs-list { display: flex; flex-direction: column; gap: 0; }
@@ -350,11 +524,14 @@ function handleLogout() {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
   display: flex; align-items: center; justify-content: center; z-index: 100;
 }
+h3 {
+  color: #111827;
+}
 .modal {
   background: #fff; border-radius: 16px; padding: 36px;
   max-width: 420px; width: 90%;
 }
-.modal h2 { font-size: 20px; font-weight: 800; margin: 0 0 12px; }
+.modal h2 { font-size: 20px; font-weight: 800; margin: 0 0 12px; color: #111827; }
 .modal p { font-size: 14px; color: #666; line-height: 1.6; margin: 0 0 28px; }
 .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
 

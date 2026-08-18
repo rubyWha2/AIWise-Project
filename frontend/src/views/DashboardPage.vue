@@ -17,10 +17,10 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="user-card">
-          <div class="avatar">AR</div>
+          <div class="avatar">AI</div>
           <div>
-            <div class="user-name">Alex Rivera</div>
-            <div class="user-email">alex@example.com</div>
+            <div class="user-name">{{ loadDetails.username }}</div>
+            <div class="user-email">{{ loadDetails.email }}</div>
           </div>
         </div>
       </div>
@@ -34,14 +34,6 @@
         </div>
         <router-link to="/articles" class="btn-primary">Start reading →</router-link>
       </header>
-
-      <div class="stats-row">
-        <div class="stat-card" v-for="stat in stats" :key="stat.label">
-          <div class="stat-value">{{ stat.value }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
-          <div class="stat-change" :class="stat.up ? 'up' : 'down'">{{ stat.change }}</div>
-        </div>
-      </div>
 
       <div class="content-grid">
         <section class="section">
@@ -62,14 +54,21 @@
 
         <section class="section">
           <div class="section-head">
-            <h2>Suggested for you</h2>
+            <h2>External articles we think you should read</h2>
           </div>
           <div class="suggestion-list">
             <div class="suggestion" v-for="s in suggestions" :key="s.title">
               <div class="suggestion-tag">{{ s.tag }}</div>
               <div class="suggestion-title">{{ s.title }}</div>
               <div class="suggestion-meta">{{ s.readTime }} min read</div>
-              <router-link to="/articles" class="suggestion-link">Read article →</router-link>
+              <a
+                :href="s.link"
+                class="suggestion-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Read article →
+             </a>
             </div>
           </div>
         </section>
@@ -79,26 +78,48 @@
 </template>
 
 <script setup>
-const stats = [
-  { label: 'Quizzes taken', value: '47', change: '+5 this week', up: true },
-  { label: 'Avg. score', value: '82%', change: '+4% vs last week', up: true },
-  { label: 'Articles read', value: '31', change: '+3 this week', up: true },
-  { label: 'Current streak', value: '7d', change: 'Personal best!', up: true },
-]
-
-const activity = [
-  { type: 'quiz', title: 'Quiz: The Roman Republic', meta: 'Today, 9:14 AM', score: 88 },
-  { type: 'read', title: 'Article: Origins of the Silk Road', meta: 'Today, 8:50 AM', score: null },
-  { type: 'quiz', title: 'Quiz: Quantum Computing Basics', meta: 'Yesterday, 7:32 PM', score: 74 },
-  { type: 'read', title: 'Article: How CRISPR Works', meta: 'Yesterday, 7:00 PM', score: null },
-  { type: 'quiz', title: 'Quiz: The French Revolution', meta: '2 days ago', score: 91 },
-]
+import { ref, reactive, onMounted,computed } from 'vue'
+import api from '../services/api'
 
 const suggestions = [
-  { tag: 'Science', title: 'The Secret Life of Mitochondria', readTime: 6 },
-  { tag: 'History', title: 'The Fall of Constantinople', readTime: 9 },
-  { tag: 'Technology', title: 'How Large Language Models Work', readTime: 8 },
+  { tag: 'Data Protection', title: 'How AI is changing data protection by Tech Target', readTime: 6, link: 'https://www.techtarget.com/data-technologies/tip/How-AI-is-changing-data-protection'},
+  { tag: 'Data Lifecycle', title: 'Data Lifecycle Management: A Simple and Complete Explanation By Telmo Silva', readTime: 9, link:'https://www.clicdata.com/blog/complete-guide-data-lifecycle-management/' },
+  { tag: 'Technology and Politics', title: 'How AI-generated disinformation might impact this year’s elections and how journalists should report on it By Marina Adami', readTime: 8, link: 'https://reutersinstitute.politics.ox.ac.uk/news/how-ai-generated-disinformation-might-impact-years-elections-and-how-journalists-should-report'},
 ]
+
+const loadDetails = ref([])
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/loadDetails')
+        loadDetails.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
+    }
+})
+
+
+const results = ref([])
+
+onMounted(async () => {
+    try{
+        const response = await api.get('/loadResults')
+        results.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
+    }
+})
+
+const activity = computed(() => {
+    return results.value.map(result => ({
+        result_id: result.result_id,
+        type: 'quiz',
+        title: `Quiz: ${result.article_title}`,
+        meta: new Date(result.created_at).toLocaleString(),
+        score: Math.round((result.score / result.max_score) * 100)
+    }))
+})
+
 </script>
 
 <style scoped>
@@ -155,18 +176,6 @@ const suggestions = [
   text-decoration: none; white-space: nowrap;
 }
 
-/* Stats */
-.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
-.stat-card {
-  background: #fff; border-radius: 12px; padding: 20px;
-  border: 1px solid #e5e5e5;
-}
-.stat-value { font-size: 28px; font-weight: 800; color: #1e1b4b; letter-spacing: -1px; margin-bottom: 4px; }
-.stat-label { font-size: 12px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-.stat-change { font-size: 12px; font-weight: 600; }
-.stat-change.up { color: #10b981; }
-.stat-change.down { color: #dc2626; }
-
 /* Content grid */
 .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .section { background: #fff; border-radius: 12px; border: 1px solid #e5e5e5; padding: 24px; }
@@ -197,10 +206,6 @@ const suggestions = [
 .suggestion-link { font-size: 13px; font-weight: 600; color: #3730a3; text-decoration: none; }
 .suggestion-link:hover { text-decoration: underline; }
 
-@media (max-width: 1100px) {
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .content-grid { grid-template-columns: 1fr; }
-}
 @media (max-width: 768px) {
   .dashboard { grid-template-columns: 1fr; }
   .sidebar { height: auto; position: static; }

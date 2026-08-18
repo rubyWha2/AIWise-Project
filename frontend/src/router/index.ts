@@ -9,6 +9,8 @@ import QuizPage from '../views/QuizPage.vue'
 import ReaderView from '../views/ReaderView.vue'
 import RegisterPage from '../views/RegisterPage.vue'
 import SummaryPage from '../views/SummaryPage.vue'
+import ForgotPassword from '../views/ForgotPassword.vue'
+import VerifyEmail from '@/views/VerifyEmail.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -54,9 +56,19 @@ const router = createRouter({
       component: SummaryPage
     },
     {
+        path: '/verify-email',
+        name: 'VerifyEmail',
+        component: VerifyEmail
+    },
+    {
       path: '/account',
       name: 'Account',
       component: AccountPage
+    },
+    {
+        path: '/forgot-password',
+        name: 'ForgotPassword',
+        component: ForgotPassword
     },
     {
       path: '/admin',

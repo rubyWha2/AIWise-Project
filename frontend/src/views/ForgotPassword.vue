@@ -17,35 +17,22 @@
 
     <div class="auth-main">
       <div class="auth-box">
-        <h1>Create your account</h1>
-        <p class="auth-sub">Free forever. No credit card required.</p>
+        <h1>Forgot your password?</h1>
+        <p class="auth-sub">No problem! Enter a new password.</p>
 
-        <form @submit.prevent="handleRegister" class="auth-form" novalidate>
-          <div class="field-row">
-            <div class="field" :class="{ 'field--error': errors.firstName }">
-              <label for="firstName">First name</label>
-              <input id="firstName" v-model="form.firstName" type="text" placeholder="Alex" autocomplete="given-name" />
-              <span v-if="errors.firstName" class="field-error">{{ errors.firstName }}</span>
-            </div>
-            <div class="field" :class="{ 'field--error': errors.lastName }">
-              <label for="lastName">Last name</label>
-              <input id="lastName" v-model="form.lastName" type="text" placeholder="Rivera" autocomplete="family-name" />
-              <span v-if="errors.lastName" class="field-error">{{ errors.lastName }}</span>
-            </div>
-          </div>
-
+        <form @submit.prevent="handleReset" class="auth-form" novalidate>
           <div class="field" :class="{ 'field--error': errors.email }">
             <label for="email">Email</label>
             <input id="email" v-model="form.email" type="email" placeholder="you@example.com" autocomplete="email" />
             <span v-if="errors.email" class="field-error">{{ errors.email }}</span>
           </div>
 
-          <div class="field" :class="{ 'field--error': errors.password }">
-            <label for="password">Password</label>
+          <div class="field" :class="{ 'field--error': errors.oldPassword }">
+            <label for="password"> Old Password</label>
             <div class="input-wrap">
               <input
-                id="password"
-                v-model="form.password"
+                id="oldPassword"
+                v-model="form.oldPassword"
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="At least 8 characters"
                 autocomplete="new-password"
@@ -54,18 +41,64 @@
                 {{ showPassword ? 'Hide' : 'Show' }}
               </button>
             </div>
-            <div class="pw-strength" v-if="form.password">
+            <div class="pw-strength" v-if="form.oldPassword">
               <div class="pw-bar" :class="`pw-bar--${pwStrength.level}`">
                 <div class="pw-fill" :style="{ width: pwStrength.pct + '%' }"></div>
               </div>
               <span class="pw-label">{{ pwStrength.label }}</span>
             </div>
-            <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
+            <span v-if="errors.oldPassword" class="field-error">{{ errors.oldPassword }}</span>
+          </div>
+
+          <div class="field" :class="{ 'field--error': errors.newPassword }">
+            <label for="password"> New Password</label>
+            <div class="input-wrap">
+              <input
+                id="newPassword"
+                v-model="form.newPassword"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+              />
+              <button type="button" class="toggle-pw" @click="showPassword = !showPassword">
+                {{ showPassword ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            <div class="pw-strength" v-if="form.newPassword">
+              <div class="pw-bar" :class="`pw-bar--${pwStrength.level}`">
+                <div class="pw-fill" :style="{ width: pwStrength.pct + '%' }"></div>
+              </div>
+              <span class="pw-label">{{ pwStrength.label }}</span>
+            </div>
+            <span v-if="errors.newPassword" class="field-error">{{ errors.newPassword }}</span>
+          </div>
+
+          <div class="field" :class="{ 'field--error': errors.confirmPassword }">
+            <label for="password"> Confirm Password</label>
+            <div class="input-wrap">
+              <input
+                id="confirmPassword"
+                v-model="form.confirmPassword"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+              />
+              <button type="button" class="toggle-pw" @click="showPassword = !showPassword">
+                {{ showPassword ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            <div class="pw-strength" v-if="form.confirmPassword">
+              <div class="pw-bar" :class="`pw-bar--${pwStrength.level}`">
+                <div class="pw-fill" :style="{ width: pwStrength.pct + '%' }"></div>
+              </div>
+              <span class="pw-label">{{ pwStrength.label }}</span>
+            </div>
+            <span v-if="errors.confirmPassword" class="field-error">{{ errors.confirmPassword }}</span>
           </div>
 
           <button type="submit" class="btn-submit" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
-            <span v-else>Create account</span>
+            <span v-else>Reset Password</span>
           </button>
 
           <p class="terms">
@@ -87,11 +120,13 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { useReCaptcha } from 'vue-recaptcha-v3'
 import { useRouter } from 'vue-router'
 
 import api from '../services/api'
 const router = useRouter()
 const showPassword = ref(false)
+const recaptcha = useReCaptcha()
 const loading = ref(false)
 const serverError = ref('')
 
@@ -101,11 +136,11 @@ const perks = [
   { icon: '📈', title: 'Progress tracking', desc: 'See retention improve week over week.' },
 ]
 
-const form = reactive({ firstName: '', lastName: '', email: '', password: '' })
-const errors = reactive({ firstName: '', lastName: '', email: '', password: '' })
+const form = reactive({ email: '', oldPassword: '', newPassword: '', confirmPassword: '' })
+const errors = reactive({ email: '', oldPassword: '', newPassword: '', confirmPassword: '' })
 
 const pwStrength = computed(() => {
-  const p = form.password
+  const p = form.newPassword
   if (!p) return { level: 'none', pct: 0, label: '' }
   let score = 0
   if (p.length >= 8) score++
@@ -123,16 +158,6 @@ function validate() {
 
   Object.keys(errors).forEach(k => errors[k] = '')
 
-  if (!form.firstName) {
-    errors.firstName = 'Required.'
-    valid = false
-  }
-
-  if (!form.lastName) {
-    errors.lastName = 'Required.'
-    valid = false
-  }
-
   if (!form.email) {
     errors.email = 'Email is required.'
     valid = false
@@ -141,44 +166,83 @@ function validate() {
     valid = false
   }
 
-  if (!form.password) {
-    errors.password = 'Password is required.'
+  if (!form.oldPassword) {
+    errors.oldPassword = 'Password is required.'
     valid = false
-  } else if (form.password.length < 8) {
-    errors.password = 'Must be at least 8 characters.'
+  }
+
+  if (!form.newPassword) {
+    errors.newPassword = 'Password is required.'
     valid = false
-  } else if (form.password.length > 28) {
-    errors.password = 'Must be less than 28 characters.'
+  } else if (form.newPassword.length < 8) {
+    errors.newPassword = 'Must be at least 8 characters.'
+    valid = false
+  } else if (form.newPassword.length > 28) {
+    errors.newPassword = 'Must be less than 28 characters.'
     valid = false
   } else if (
-    !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*()]).{8,28}/.test(form.password)
+    !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*()]).{8,28}/.test(form.newPassword)
   ) {
-    errors.password =
+    errors.newPassword =
       'Must contain uppercase, lowercase, number and special character.'
+    valid = false
+  }
+
+  if (!form.confirmPassword) {
+    errors.confirmPassword = 'Password is required.'
+    valid = false
+  } else if (form.confirmPassword.length < 8) {
+    errors.confirmPassword = 'Must be at least 8 characters.'
+    valid = false
+  } else if (form.confirmPassword.length > 28) {
+    errors.confirmPassword = 'Must be less than 28 characters.'
+    valid = false
+  } else if (
+    !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&*()]).{8,28}/.test(form.confirmPassword)
+  ) {
+    errors.confirmPassword =
+      'Must contain uppercase, lowercase, number and special character.'
+    valid = false
+  }
+
+  if (form.newPassword !== form.confirmPassword) {
+    errors.confirmPassword = "Passwords do not match."
     valid = false
   }
 
   return valid
 }
 
-async function handleRegister() {
+async function handleReset() {
   if (!validate()) return
   loading.value = true
   serverError.value = ''
   try {
-    const response = await api.post('/register', {
-      firstName: form.firstName,
-      lastName: form.lastName,
+    let token = ''
+
+    if (recaptcha) {
+      try {
+        await recaptcha.recaptchaLoaded()
+        token = await recaptcha.executeRecaptcha('change_password')
+      } catch (recaptchaError) {
+        console.warn('reCAPTCHA could not create a token:', recaptchaError)
+      }
+    }
+
+    const response = await api.post('/changePassword', {
       email: form.email,
-      password: form.password
+      oldPassword: form.oldPassword,
+      newPassword: form.newPassword,
+      confirmPassword: form.confirmPassword,
+      recaptchaToken: token
     })
     console.log(response.data)
 
     // Clear the form
-    form.firstName = ''
-    form.lastName = ''
     form.email = ''
-    form.password = ''
+    form.oldPassword = ''
+    form.newPassword = ''
+    form.confirmPassword = ''
 
     router.push('/login')
 

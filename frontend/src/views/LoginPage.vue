@@ -67,8 +67,11 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { useReCaptcha } from 'vue-recaptcha-v3'
+import api from '../services/api'
 
 const router = useRouter()
+const recaptcha = useReCaptcha()
 const showPassword = ref(false)
 const loading = ref(false)
 const serverError = ref('')
@@ -91,11 +94,32 @@ async function handleLogin() {
   loading.value = true
   serverError.value = ''
   try {
-    // TODO: replace with actual API call
-    await new Promise(r => setTimeout(r, 800))
+    let token = ''
+
+    if (recaptcha) {
+      try {
+        await recaptcha.recaptchaLoaded()
+        token = await recaptcha.executeRecaptcha('login')
+      } catch (recaptchaError) {
+        console.warn('reCAPTCHA could not create a token:', recaptchaError)
+      }
+    }
+
+    const response = await api.post('/login', {
+      email: form.email,
+      password: form.password,
+      recaptchaToken: token
+    })
+
+    console.log(response.data)
     router.push('/dashboard')
+
   } catch (e) {
-    serverError.value = 'Invalid email or password.'
+    if (e.response?.status === 429) {
+      serverError.value = 'Too many login attempts. Please wait a minute and try again.'
+    } else {
+      serverError.value = e.response?.data?.message || 'Unable to connect to the server.'
+    }
   } finally {
     loading.value = false
   }

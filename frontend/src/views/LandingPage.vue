@@ -30,11 +30,6 @@
           <span class="stat-label"> In certain UK sectors 44% of workers are not confident in processing sensitive data</span>
         </div>
 
-        <div class="card-float card-float--a">
-          <span class="stat-num">£17.5 million </span>
-          <span class="stat-label">Is the maximum fine UK businesses may face for GDPR violations</span>
-        </div>
-
       </div>
     </section>
 
