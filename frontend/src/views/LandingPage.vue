@@ -23,13 +23,8 @@
           <router-link to="/login" class="btn-ghost btn-lg">Sign in</router-link>
         </div>
       </div>
+
       <div class="hero-visual">
-
-        <div class="card-float card-float--b">
-          <span class="stat-num">Around half of frontline employees lack confidence in handling GDPR tasks</span>
-          <span class="stat-label"> In certain UK sectors 44% of workers are not confident in processing sensitive data</span>
-        </div>
-
       </div>
     </section>
 
@@ -100,20 +95,146 @@
 .btn-lg { padding: 14px 28px; font-size: 16px; }
 
 /* Hero */
-.hero { max-width: 1160px; margin: 0 auto; padding: 100px 32px 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
-.hero-tag { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #3730a3; margin-bottom: 20px; }
-.hero-headline { font-size: clamp(48px, 6vw, 80px); font-weight: 900; line-height: 1.0; letter-spacing: -2px; margin: 0 0 24px; }
-.hero-headline em { font-style: normal; color: #3730a3; }
-.hero-sub { font-size: 18px; color: #555; line-height: 1.7; max-width: 460px; margin: 0 0 40px; }
-.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.hero {
+  min-height: 85vh;
+  position: relative;
 
-.hero-visual { position: relative; height: 360px; }
-.card-float { position: absolute; background: #fff; border: 1px solid #e5e5e5; border-radius: 16px; padding: 20px 28px; box-shadow: 0 8px 32px rgba(55,48,163,0.08); }
-.card-float--a { top: 20px; left: 40px; }
-.card-float--b { top: 140px; right: 0; }
-.card-float--c { bottom: 20px; left: 60px; }
-.stat-num { display: block; font-size: 36px; font-weight: 900; color: #3730a3; letter-spacing: -1px; }
-.stat-label { display: block; font-size: 13px; color: #888; font-weight: 500; margin-top: 2px; }
+  background-image: url('/AIWiseLanding.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: 70% center;
+
+  display: flex;
+  align-items: center;
+
+  padding: 80px 32px;
+}
+
+/* Fade the image behind the text */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.98) 30%,
+    rgba(255, 255, 255, 0.75) 45%,
+    rgba(255, 255, 255, 0.15) 70%,
+    rgba(255, 255, 255, 0) 100%
+  );
+
+  z-index: 0;
+}
+
+/* Main hero container */
+.hero-inner {
+  position: relative;
+  z-index: 1;
+
+  width: 100%;
+  max-width: 1160px;
+
+  margin: 0 auto;
+}
+
+/* Keep ALL text on the left */
+.hero-content {
+  width: 50%;
+  max-width: 560px;
+}
+
+/* Small heading */
+.hero-tag {
+  margin-bottom: 18px;
+
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+
+  color: #3730a3;
+}
+
+/* Main heading */
+.hero-headline {
+  margin: 0 0 24px;
+
+  font-size: clamp(48px, 6vw, 76px);
+  line-height: 0.98;
+  font-weight: 800;
+
+  color: #1e1b4b;
+}
+
+.hero-headline em {
+  font-style: italic;
+  color: #3730a3;
+}
+
+/* Description */
+.hero-sub {
+  max-width: 520px;
+
+  margin: 0 0 32px;
+
+  font-size: 17px;
+  line-height: 1.7;
+
+  color: #555;
+}
+
+/* Buttons */
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Floating card */
+.hero-visual {
+  position: absolute;
+
+  right: 0;
+  top: 50%;
+
+  transform: translateY(-50%);
+
+  width: 360px;
+}
+
+.card-float {
+  padding: 22px;
+
+  background: rgba(255, 255, 255, 0.94);
+
+  border-radius: 16px;
+
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+
+  backdrop-filter: blur(8px);
+}
+
+.stat-num {
+  display: block;
+
+  margin-bottom: 10px;
+
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 700;
+
+  color: #1e1b4b;
+}
+
+.stat-label {
+  display: block;
+
+  font-size: 12px;
+  line-height: 1.5;
+
+  color: #666;
+}
 
 /* Features */
 .features { border-top: 1px solid #e5e5e5; padding: 80px 32px; }
