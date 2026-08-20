@@ -14,6 +14,15 @@
         <router-link to="/account" class="nav-item nav-item--active">
           <span class="nav-icon">◯</span> Account
         </router-link>
+
+        <router-link
+            v-if="loadAdmin?.role_id === 1"
+            to="/admin"
+            class="nav-item"
+        >
+
+  <span class="nav-icon">⚙</span> Admin
+</router-link>
       </nav>
       <div class="sidebar-bottom">
         <div class="user-card">
@@ -207,6 +216,20 @@ onMounted(async () => {
     } catch (error) {
         console.error('Failed to load load users details', error)
     }
+})
+
+const loadAdmin = ref(null)
+
+onMounted(async () => {
+  try {
+    const response = await api.get('/getAdminStatus')
+
+    console.log('Admin status:', response.data)
+
+    loadAdmin.value = response.data
+  } catch (error) {
+    console.error('Failed to load admin details', error)
+  }
 })
 
 const profile = reactive({

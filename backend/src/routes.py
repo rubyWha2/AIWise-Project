@@ -804,7 +804,6 @@ def loadResults():
         ORDER BY r.created_at DESC
         """,(user_id,))
         rows = cur.fetchall()
-        print(rows)
 
     conn.close()
 
@@ -823,4 +822,33 @@ def loadResults():
             "article_title": row[6]
         })
     return jsonify(results), 200
+
+
+@main.route("/api/getAdminStatus", methods=["GET"])
+def getAdminStatus():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "No user found."}), 401
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT user_id, role_id
+            FROM users
+            WHERE user_id = %s AND role_id = 1
+        """, (user_id,))
+
+        row = cur.fetchone()
+
+    conn.close()
+
+    if row is None:
+        return jsonify({"message": "User is not an admin."}), 403
+
+    return jsonify({
+        "user_id": row[0],
+        "role_id": row[1]
+    }), 200
 

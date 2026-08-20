@@ -32,17 +32,17 @@
       <div class="features-inner">
         <h2 class="section-title">How it works</h2>
         <div class="features-grid">
-          <router-link to="/articles" class="feature">
+          <router-link to="/login" class="feature">
             <div class="feature-num">01</div>
             <h3>Read an article</h3>
             <p>Browse our curated library across science, history, technology, and culture.</p>
           </router-link>
-          <router-link to="/quiz" class="feature">
+          <router-link to="/login" class="feature">
             <div class="feature-num">02</div>
             <h3>Take the quiz</h3>
             <p>Answer adaptive questions generated from the article's core concepts.</p>
           </router-link>
-          <router-link to="/dashboard" class="feature">
+          <router-link to="/login" class="feature">
             <div class="feature-num">03</div>
             <h3>Track your growth</h3>
             <p>See your scores improve and build a streak that keeps you coming back.</p>
