@@ -134,9 +134,20 @@ def get_quizzes():
 
     with conn.cursor() as cur:
         cur.execute("""
-               SELECT * FROM quizzes
-               ORDER BY quiz_id
-           """, (id,))
+               SELECT
+                    q.quiz_id,
+                    q.article_id,
+                    q.question,
+                    q.option_a,
+                    q.option_b,
+                    q.option_c,
+                    q.option_d,
+                    q.correct_answer,
+                    a.title
+               FROM quizzes q
+               JOIN articles a ON q.article_id = a.article_id
+               ORDER BY article_id DESC
+           """,)
 
         rows = cur.fetchall()
 
@@ -155,7 +166,8 @@ def get_quizzes():
             "option_b": row[4],
             "option_c":	row[5],
             "option_d": row[6],
-            "correct_answer": row[7]
+            "correct_answer": row[7],
+            "title": row[8]
     })
     return jsonify(quizzes)
 
@@ -268,7 +280,7 @@ def get_users():
 
     with conn.cursor() as cur:
         cur.execute("""
-                SELECT user_id, username, email, password_hash, role_id
+                SELECT user_id, username, email, password_hash, role_id, created_at
                 FROM users
                 ORDER BY user_id
             """)
@@ -285,7 +297,8 @@ def get_users():
             "username": row[1],
             "email": row[2],
             "password_hash": row[3],
-            "role_id": row[4]
+            "role_id": row[4],
+            "created_at": row[5]
         })
 
     return jsonify(users)
@@ -851,4 +864,63 @@ def getAdminStatus():
         "user_id": row[0],
         "role_id": row[1]
     }), 200
+
+@main.route("/api/count_all", methods=["GET"])
+def count_all():
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM users) AS users_id,
+                (SELECT COUNT(*) FROM articles) AS articles_id,
+                (SELECT COUNT(*) FROM results) AS result_id,
+                (SELECT COUNT(*) FROM quizzes) AS quiz_id
+        """)
+
+        row = cur.fetchone()
+
+    conn.close()
+
+    return jsonify({
+        "users": row[0],
+        "articles": row[1],
+        "quizzes_taken": row[2],
+        "questions": row[3]
+    }), 200
+
+@main.route("/api/getTop6users", methods=["GET"])
+def getTop6users():
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT user_id, username, email, created_at
+            FROM users
+            ORDER BY created_at DESC
+            LIMIT 6
+        """)
+
+        rows = cur.fetchall()
+
+    conn.close()
+
+    users = []
+
+    for row in rows:
+        users.append({
+            "user_id": row[0],
+            "username": row[1],
+            "email": row[2],
+            "created_at": row[3]
+        })
+
+    return jsonify(users)
+
 

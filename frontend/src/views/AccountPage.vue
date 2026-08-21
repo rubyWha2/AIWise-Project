@@ -214,7 +214,7 @@ onMounted(async () => {
         const response = await api.get('/loadDetails')
         loadDetails.value = response.data
     } catch (error) {
-        console.error('Failed to load load users details', error)
+        console.error('Failed to load users details', error)
     }
 })
 
