@@ -100,16 +100,16 @@
           </div>
           <table class="data-table">
             <thead>
-              <tr><th>Title</th><th>Tag</th><th>Status</th><th></th></tr>
+              <tr><th>Title</th><th>Tag</th><th></th></tr>
             </thead>
             <tbody>
-              <tr v-for="a in filteredAdminArticles" :key="a.id">
+              <tr v-for="a in filteredAdminArticles" :key="a.article_id">
                 <td><strong>{{ a.title }}</strong></td>
                 <td><span class="tag-chip">{{ a.category }}</span></td>
                 <td>
                   <div class="row-actions">
                     <button class="row-btn">Edit</button>
-                    <button class="row-btn row-btn--danger">Delete</button>
+                    <button class="row-btn row-btn--danger" @click="deleteArticle(a)">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -144,7 +144,7 @@
                         class="role-chip"
                         :class="u.role_id === 1 ? 'role-chip--admin' : 'role-chip--user'"
                     >
-                        {{ u.role_id === 1 ? 'Admin' : 'User' }}
+                        {{ u.banned ? 'Banned' : u.role_id === 1 ? 'Admin' : 'User' }}
                     </span>
                 </td>
 
@@ -152,7 +152,13 @@
                 <td>
                   <div class="row-actions">
                     <button class="row-btn">View</button>
-                    <button class="row-btn row-btn--danger">Ban</button>
+                    <button
+                      class="row-btn row-btn--danger"
+                      :disabled="u.banned"
+                      @click="banUser(u)"
+                    >
+                      {{ u.banned ? 'Banned' : 'Ban' }}
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -172,13 +178,13 @@
               <tr><th>Question</th><th>Article</th><th></th></tr>
             </thead>
             <tbody>
-              <tr v-for="q in quizQuestions" :key="q.id">
+              <tr v-for="q in quizQuestions" :key="q.quiz_id">
                 <td class="question-cell">{{ q.question }}</td>
                 <td class="muted">{{ q.title }}</td>
                 <td>
                   <div class="row-actions">
                     <button class="row-btn">Edit</button>
-                    <button class="row-btn row-btn--danger">Delete</button>
+                    <button class="row-btn row-btn--danger" @click="deleteQuiz(q)">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -222,8 +228,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
 
 const activeSection = ref('overview')
@@ -239,49 +244,49 @@ const loadTotals = ref({
   questions: 0
 })
 
-onMounted(async () => {
+async function loadTotalsData() {
     try{
         const response = await api.get('/count_all')
         loadTotals.value = response.data
     } catch (error) {
         console.error('Failed to load totals', error)
     }
-})
+}
 
 const new_users = ref([])
 
-onMounted(async () => {
+async function loadRecentUsers() {
     try{
         const response = await api.get('/getTop6users')
         new_users.value = response.data
     } catch (error) {
         console.error('Failed to load users details', error)
     }
-})
+}
 
 
 const quizQuestions = ref([])
 
-onMounted(async () => {
+async function loadQuizzes() {
     try{
         const response = await api.get('/quizzes')
         quizQuestions.value = response.data
     } catch (error) {
         console.error('Failed to load quizzes', error)
     }
-})
+}
 
 
 const adminArticles = ref([])
 
-onMounted(async () => {
+async function loadArticles() {
     try{
         const response = await api.get('/articles')
         adminArticles.value = response.data
     } catch (error) {
-        console.error('Failed to load load users details', error)
+        console.error('Failed to load articles', error)
     }
-})
+}
 
 const navItems = [
   { key: 'overview', icon: '⊞', label: 'Overview' },
@@ -293,34 +298,87 @@ const navItems = [
 
 const filteredAdminArticles = computed(() => {
   return adminArticles.value.filter(a => {
-    return a.title
+    const matchSearch = a.title
       .toLowerCase()
       .includes(articleSearch.value.toLowerCase())
+    const matchTag = !articleFilter.value || a.category === articleFilter.value
+
+    return matchSearch && matchTag
   })
 })
 
+const articleTags = computed(() => {
+  const categories = adminArticles.value.map(a => a.category).filter(Boolean)
+  return [...new Set(categories)]
+})
 
 const adminUsers = ref([])
 
-onMounted(async () => {
+async function loadUsers() {
     try{
         const response = await api.get('/users')
         adminUsers.value = response.data
     } catch (error) {
         console.error('Failed to load load users details', error)
     }
-})
+}
 
 const filteredUsers = computed(() => {
   const q = userSearch.value.toLowerCase()
 
   return adminUsers.value.filter(u =>
     !q ||
-    u.name.toLowerCase().includes(q) ||
+    u.username.toLowerCase().includes(q) ||
     u.email.toLowerCase().includes(q)
   )
 })
 
+async function banUser(user) {
+  if (!confirm(`Ban ${user.username}?`)) return
+
+  try {
+    await api.put(`/users/${user.user_id}/ban`)
+    await loadUsers()
+    await loadRecentUsers()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to ban user.')
+  }
+}
+
+async function deleteArticle(article) {
+  if (!confirm(`Delete "${article.title}"? This will also remove its quizzes.`)) return
+
+  try {
+    await api.delete(`/articles/${article.article_id}`)
+    await loadArticles()
+    await loadQuizzes()
+    await loadTotalsData()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to delete article.')
+  }
+}
+
+async function deleteQuiz(quiz) {
+  if (!confirm('Delete this quiz question?')) return
+
+  try {
+    await api.delete(`/quizzes/${quiz.quiz_id}`)
+    await loadQuizzes()
+    await loadTotalsData()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to delete quiz question.')
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([
+    loadTotalsData(),
+    loadRecentUsers(),
+    loadQuizzes(),
+    loadArticles(),
+    loadUsers(),
+  ])
+})
 
 function correctColor(rate) {
   if (rate >= 75) return '#10b981'
@@ -427,9 +485,10 @@ function correctColor(rate) {
   padding: 4px 10px; border-radius: 6px; border: 1px solid #e5e5e5;
   background: #fff; font-size: 12px; font-weight: 600; color: #0f0f0f; cursor: pointer; transition: all 0.15s;
 }
-.row-btn:hover { border-color: #3730a3; color: #3730a3; }
+.row-btn:hover:not(:disabled) { border-color: #3730a3; color: #3730a3; }
 .row-btn--danger { color: #0f0f0f; }
-.row-btn--danger:hover { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+.row-btn--danger:hover:not(:disabled) { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+.row-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* User cell */
 .user-cell { display: flex; align-items: center; gap: 10px; }

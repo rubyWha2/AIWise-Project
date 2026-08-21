@@ -21,14 +21,17 @@ PEPPER = os.getenv("PASSWORD_PEPPER", "")
 main = Blueprint('main', __name__)
 
 def login_rate_limit_key():
+    # Limit login attempts per browser/IP and email instead of blocking every account together.
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
     return f"{request.remote_addr}:{email}"
 
 def verify_recaptcha_token(token, action):
+    # Shared server-side verifier for invisible reCAPTCHA v3 actions.
     secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
 
     if current_app.debug and not secret_key:
+        # Local development can continue without Google verification when no secret is configured.
         return True, "", 200
 
     if not secret_key:
@@ -68,6 +71,26 @@ def verify_recaptcha_token(token, action):
 
     return True, "", 200
 
+def current_user_is_admin():
+    admin_id = session.get("user_id")
+
+    if not admin_id:
+        return False
+
+    conn = get_db_connection()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT role_id
+            FROM users
+            WHERE user_id = %s
+        """, (admin_id,))
+        admin = cur.fetchone()
+
+    conn.close()
+
+    return bool(admin and admin[0] == 1)
+
 @main.route('/api/test')
 def test():
     return jsonify({
@@ -77,6 +100,7 @@ def test():
 
 @main.route("/api/articles", methods=["GET"])
 def get_articles():
+    # Article list used by the frontend articles grid.
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -104,6 +128,7 @@ def get_articles():
 
 @main.route("/api/articles/<int:article_id>", methods=["GET"])
 def get_inv_article(article_id):
+    # Single article payload used by the reader page.
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -130,6 +155,7 @@ def get_inv_article(article_id):
 
 @main.route("/api/quizzes", methods=["GET"])
 def get_quizzes():
+    # Admin-friendly quiz list, including the related article title.
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -173,6 +199,7 @@ def get_quizzes():
 
 @main.route("/api/quiz/<int:article_id>", methods=["GET"])
 def get_inv_quiz(article_id):
+    # Quiz questions for one article, loaded when the user starts a quiz.
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -220,6 +247,7 @@ def get_inv_quiz(article_id):
 
 @main.route("/api/results", methods=["GET"])
 def get_results():
+    # Raw quiz results endpoint for administrative views.
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -280,7 +308,7 @@ def get_users():
 
     with conn.cursor() as cur:
         cur.execute("""
-                SELECT user_id, username, email, password_hash, role_id, created_at
+                SELECT user_id, username, email, password_hash, role_id, created_at, banned
                 FROM users
                 ORDER BY user_id
             """)
@@ -298,7 +326,8 @@ def get_users():
             "email": row[2],
             "password_hash": row[3],
             "role_id": row[4],
-            "created_at": row[5]
+            "created_at": row[5],
+            "banned": row[6]
         })
 
     return jsonify(users)
@@ -306,6 +335,7 @@ def get_users():
 @main.route("/api/register", methods=["POST"])
 @limiter.limit("5 per hour")
 def register():
+    # Create a new standard user after validating email and password strength.
     email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
 
     data = request.get_json()
@@ -342,6 +372,7 @@ def register():
         return jsonify({"message": "Email already exists"}), 400
 
 
+    # The pepper is appended before hashing so stored hashes are not based on the raw password alone.
     peppered_password = password + PEPPER
     hashed_password = generate_password_hash(peppered_password)
     created_date = datetime.now(timezone.utc)
@@ -358,6 +389,7 @@ def register():
 @main.route("/api/login", methods=["POST"])
 @limiter.limit("7 per minute", key_func=login_rate_limit_key)
 def login():
+    # Authenticate a user, update failed-attempt counters, then verify reCAPTCHA before session creation.
     data = request.get_json(silent=True) or {}
 
     email = data.get("email", "").strip().lower()
@@ -372,7 +404,7 @@ def login():
 
     conn = get_db_connection()
     with conn.cursor() as cur:
-        cur.execute("SELECT user_id, username, password_hash, role_id, failed_attempts, locked_until FROM users WHERE LOWER(email) = %s", (email,))
+        cur.execute("SELECT user_id, username, password_hash, role_id, failed_attempts, locked_until, banned FROM users WHERE LOWER(email) = %s", (email,))
 
         user = cur.fetchone()
 
@@ -386,6 +418,11 @@ def login():
         role_id = user[3]
         failed_attempts = user[4] or 0
         locked_until = user[5]
+        banned = user[6]
+
+        if banned:
+            conn.close()
+            return jsonify({"message": "This account has been banned."}), 403
 
         if locked_until and locked_until.tzinfo is None:
             locked_until = locked_until.replace(tzinfo=timezone.utc)
@@ -394,6 +431,7 @@ def login():
             conn.close()
             return jsonify({"message": "Account locked. Try again later."}), 423
 
+        # Failed password attempts are counted before reCAPTCHA so account lockout still works.
         if not check_password_hash(password_hash, peppered_password):
             failed_attempts += 1
             if failed_attempts >= 5:
@@ -417,6 +455,7 @@ def login():
             return jsonify({"message": "Invalid email or password"}), 401
 
 
+        # Only successful password checks reach reCAPTCHA verification.
         recaptcha_ok, recaptcha_message, recaptcha_status = verify_recaptcha_token(recaptcha_token, "login")
         if not recaptcha_ok:
             conn.close()
@@ -452,6 +491,7 @@ def login():
 @main.route("/api/changePassword", methods=["POST"])
 @limiter.limit("5 per hour")
 def change_password():
+    # Change the logged-in user's password after checking the old password and reCAPTCHA action.
     user_id = session.get("user_id")
 
     if not user_id:
@@ -518,6 +558,7 @@ def change_password():
 @main.route("/api/updateAccount", methods=["POST"])
 @limiter.limit("20 per minute")
 def update_account():
+    # Save editable account profile fields for the logged-in user.
     user_id = session.get("user_id")
 
     if not user_id:
@@ -554,6 +595,7 @@ def update_account():
 @main.route("/api/deleteAccount", methods=["POST"])
 @limiter.limit("3 per hour")
 def delete_account():
+    # Permanently remove the currently logged-in account.
     user_id = session.get("user_id")
 
     if not user_id:
@@ -572,12 +614,14 @@ def delete_account():
 
 @main.route("/api/logout", methods=["POST"])
 def logout():
+    # Clear all session data so protected endpoints require login again.
     session.clear()
 
     return jsonify({"message": "Logged out"}), 200
 
 @main.route("/api/sendVerificationEmail", methods=["POST"])
 def sendVerificationEmail():
+    # Create an email verification token and send the user a verification link.
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
@@ -648,6 +692,7 @@ def sendVerificationEmail():
 
 @main.route("/api/verifyEmail", methods=["POST"])
 def verifyEmail():
+    # Mark the account as verified when the token from the email link is valid.
     data = request.get_json()
     token = data.get("token")
 
@@ -681,6 +726,7 @@ def verifyEmail():
 
 @main.route("/api/resendVerificationEmail", methods=["POST"])
 def resendVerificationEmail():
+    # Generate a fresh verification token for users who request another email.
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
@@ -741,6 +787,7 @@ def resendVerificationEmail():
 
 @main.route("/api/updateResults", methods=["POST"])
 def updateResults():
+    # Persist a completed quiz score for the current session user.
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
@@ -769,6 +816,7 @@ def updateResults():
 
 @main.route("/api/loadDetails", methods=["GET"])
 def loadDetails():
+    # Lightweight account identity payload used by dashboard/account pages.
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "No user found."}), 401
@@ -795,6 +843,7 @@ def loadDetails():
 
 @main.route("/api/loadResults", methods=["GET"])
 def loadResults():
+    # User-specific quiz history, joined with article titles for display.
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "No user found."}), 401
@@ -839,6 +888,7 @@ def loadResults():
 
 @main.route("/api/getAdminStatus", methods=["GET"])
 def getAdminStatus():
+    # Admin gate used by the frontend before showing privileged controls.
     user_id = session.get("user_id")
 
     if not user_id:
@@ -867,6 +917,7 @@ def getAdminStatus():
 
 @main.route("/api/count_all", methods=["GET"])
 def count_all():
+    # Overview totals for the admin dashboard cards.
 
     user_id = session.get("user_id")
 
@@ -897,6 +948,7 @@ def count_all():
 
 @main.route("/api/getTop6users", methods=["GET"])
 def getTop6users():
+    # Most recent users displayed in the admin overview panel.
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -923,4 +975,112 @@ def getTop6users():
 
     return jsonify(users)
 
+@main.route("/api/users/<int:user_id>/ban", methods=["PUT"])
+def ban_user(user_id):
+    admin_id = session.get("user_id")
 
+    if not admin_id:
+        return jsonify({"message": "Please log in"}), 401
+
+    conn = get_db_connection()
+
+    try:
+        with conn.cursor() as cur:
+
+            # Check the logged-in user is an admin
+            cur.execute("""
+                SELECT role_id
+                FROM users
+                WHERE user_id = %s
+            """, (admin_id,))
+
+            admin = cur.fetchone()
+
+            if not admin or admin[0] != 1:
+                return jsonify({"message": "Admin access required"}), 403
+
+            # Prevent an admin banning themselves
+            if admin_id == user_id:
+                return jsonify({
+                    "message": "You cannot ban your own account"
+                }), 400
+
+            cur.execute("""
+                UPDATE users
+                SET banned = TRUE
+                WHERE user_id = %s
+            """, (user_id,))
+
+            if cur.rowcount == 0:
+                return jsonify({"message": "User not found"}), 404
+
+        conn.commit()
+
+        return jsonify({
+            "message": "User banned successfully"
+        }), 200
+
+    except Exception as e:
+        conn.rollback()
+        print("Ban user error:", e)
+
+        return jsonify({
+            "message": "Failed to ban user"
+        }), 500
+
+    finally:
+        conn.close()
+
+@main.route("/api/articles/<int:article_id>", methods=["DELETE"])
+def delete_article(article_id):
+    if not current_user_is_admin():
+        return jsonify({"message": "Admin access required"}), 403
+
+    conn = get_db_connection()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM results WHERE article_id = %s", (article_id,))
+            cur.execute("DELETE FROM quizzes WHERE article_id = %s", (article_id,))
+            cur.execute("DELETE FROM articles WHERE article_id = %s", (article_id,))
+
+            if cur.rowcount == 0:
+                conn.rollback()
+                return jsonify({"message": "Article not found"}), 404
+
+        conn.commit()
+        return jsonify({"message": "Article deleted successfully"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        print("Delete article error:", e)
+        return jsonify({"message": "Failed to delete article"}), 500
+
+    finally:
+        conn.close()
+
+@main.route("/api/quizzes/<int:quiz_id>", methods=["DELETE"])
+def delete_quiz(quiz_id):
+    if not current_user_is_admin():
+        return jsonify({"message": "Admin access required"}), 403
+
+    conn = get_db_connection()
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM quizzes WHERE quiz_id = %s", (quiz_id,))
+
+            if cur.rowcount == 0:
+                conn.rollback()
+                return jsonify({"message": "Quiz question not found"}), 404
+
+        conn.commit()
+        return jsonify({"message": "Quiz question deleted successfully"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        print("Delete quiz error:", e)
+        return jsonify({"message": "Failed to delete quiz question"}), 500
+
+    finally:
+        conn.close()
