@@ -60,7 +60,15 @@
 
     <footer class="footer">
       <div class="footer-inner">
+
         <span class="logo">AiWise</span>
+
+        <div class="footer-links">
+          <router-link to="/privacy">Privacy</router-link>
+        </div>
+        <div class="footer-links">
+          <router-link to="/Terms">Terms of Service </router-link>
+        </div>
         <span class="footer-copy">&copy; 2026 AiWise. All rights reserved.</span>
       </div>
     </footer>

@@ -70,7 +70,9 @@
 
           <p class="terms">
             By signing up, you agree to our
-            <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+            <router-link to="/Terms">Terms of Use</router-link>
+            and
+            <router-link to="/Privacy">Privacy Policy</router-link>.
           </p>
 
           <p v-if="serverError" class="server-error">{{ serverError }}</p>
