@@ -64,10 +64,57 @@
         <span class="footer-copy">&copy; 2026 AiWise. All rights reserved.</span>
       </div>
     </footer>
+
+<!-- Cookie popup -->
+    <div
+      v-if="showCookieNotice"
+      class="cookie-overlay"
+    >
+      <div class="cookie-modal">
+
+        <div class="cookie-icon"></div>
+
+        <h2>Cookies on AIWise</h2>
+
+        <p>
+          AIWise uses an essential cookie to keep you signed in and provide
+          core account functionality.
+        </p>
+
+        <p class="cookie-small">
+          We do not use advertising cookies.
+        </p>
+
+        <button
+          class="cookie-btn"
+          @click="acceptCookies"
+        >
+          Got it
+        </button>
+
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+
+const showCookieNotice = ref(false)
+
+onMounted(() => {
+  const accepted = localStorage.getItem('cookieNoticeAccepted')
+
+  if (!accepted) {
+    showCookieNotice.value = true
+  }
+})
+
+const acceptCookies = () => {
+  localStorage.setItem('cookieNoticeAccepted', 'true')
+  showCookieNotice.value = false
+}
+
 </script>
 
 <style scoped>
@@ -258,6 +305,84 @@
 .footer { border-top: 1px solid #e5e5e5; padding: 24px 32px; }
 .footer-inner { max-width: 1160px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
 .footer-copy { font-size: 13px; color: #aaa; }
+
+.cookie-overlay {
+  position: fixed;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(15, 15, 30, 0.55);
+
+  z-index: 9999;
+}
+
+.cookie-modal {
+  width: 90%;
+  max-width: 440px;
+
+  background: white;
+
+  padding: 32px;
+
+  border-radius: 16px;
+
+  text-align: center;
+
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.cookie-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.cookie-modal h2 {
+  margin: 0 0 12px;
+
+  color: #1e1b4b;
+
+  font-size: 22px;
+}
+
+.cookie-modal p {
+  color: #555;
+
+  font-size: 14px;
+  line-height: 1.6;
+
+  margin-bottom: 10px;
+}
+
+.cookie-small {
+  font-size: 12px !important;
+  color: #888 !important;
+}
+
+.cookie-btn {
+  margin-top: 16px;
+
+  width: 100%;
+
+  padding: 12px 20px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: #3730a3;
+  color: white;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.cookie-btn:hover {
+  background: #312e81;
+}
 
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
