@@ -10,6 +10,7 @@ def get_db_connection():
     Uses psycopg (v3) if available, otherwise falls back to psycopg2.
     Raises a clear error if no supported driver is installed.
     """
+    # Database credentials come from .env rather than being hardcoded.
     host = os.getenv("DB_HOST")
     dbname = os.getenv("DB_NAME")
     user = os.getenv("DB_USER")
