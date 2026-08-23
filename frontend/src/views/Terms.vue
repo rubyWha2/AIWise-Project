@@ -132,6 +132,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 const activeSection = ref('about-aiwise')
 const contentRef = ref(null)
 
+// Terms content stays in one data array so the page and table of contents remain in sync.
 const sections = [
   {
     id: 'about-aiwise',
@@ -373,6 +374,7 @@ const sections = [
 ]
 
 function scrollTo(id) {
+  // Use smooth scrolling for table-of-contents links and update the active marker immediately.
   document
     .getElementById(id)
     ?.scrollIntoView({
@@ -384,6 +386,7 @@ function scrollTo(id) {
 }
 
 function onScroll() {
+  // Track the section closest to the top so the sticky contents menu follows the reader.
   const allIds = [
     ...sections.map(section => section.id),
     'contact-us'
@@ -400,12 +403,14 @@ function onScroll() {
 }
 
 onMounted(() => {
+  // Passive scroll listener keeps the legal page responsive while highlighting sections.
   window.addEventListener('scroll', onScroll, {
     passive: true
   })
 })
 
 onUnmounted(() => {
+  // Remove the listener when leaving the page to avoid duplicate handlers.
   window.removeEventListener('scroll', onScroll)
 })
 </script>

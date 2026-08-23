@@ -101,10 +101,11 @@ const router = useRouter()
 // Page state
 const state = ref('pending')
 
-// User email (optional)
+// User email is optional because verification can still work with just the token.
 const email = ref(route.query.email ?? '')
 
 const maskedEmail = computed(() => {
+  // Mask the address for reassurance without exposing the full email on screen.
   if (!email.value) return ''
 
   const [local, domain] = email.value.split('@')
@@ -115,7 +116,7 @@ const maskedEmail = computed(() => {
   return `${visible}${masked}@${domain}`
 })
 
-// Progress steps
+// Progress steps stay static while currentStep changes with verification state.
 const steps = [
   'Account created',
   'Email sent',
@@ -127,7 +128,7 @@ const currentStep = computed(() => {
   return state.value === 'verified' ? 4 : 2
 })
 
-// Resend email
+// Resend state prevents repeated email requests while the cooldown is active.
 const resending = ref(false)
 const resendCooldown = ref(0)
 const resentMsg = ref('')
@@ -135,6 +136,7 @@ const resentMsg = ref('')
 let cooldownTimer = null
 
 async function resend() {
+  // Keep resend requests spaced out so accidental double-clicks do not spam email.
   if (resendCooldown.value > 0) return
 
   resending.value = true
@@ -166,7 +168,7 @@ async function resend() {
   }
 }
 
-// Verify email when page opens
+// Verify email when the page opens using the token from the route query.
 onMounted(async () => {
 
   const token = route.query.token
@@ -194,6 +196,7 @@ function goToDashboard() {
 }
 
 onUnmounted(() => {
+  // Clear the cooldown interval when navigating away from the page.
   if (cooldownTimer) {
     clearInterval(cooldownTimer)
   }

@@ -3,6 +3,7 @@
 
 <template>
   <div class="min-h-screen bg-white text-zinc-900 antialiased">
+    <!-- Router view keeps every page rendered through the central Vue route map. -->
     <router-view />
   </div>
 </template>

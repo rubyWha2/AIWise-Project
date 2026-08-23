@@ -11,9 +11,12 @@ import RegisterPage from '../views/RegisterPage.vue'
 import SummaryPage from '../views/SummaryPage.vue'
 import ForgotPassword from '../views/ForgotPassword.vue'
 import VerifyEmail from '@/views/VerifyEmail.vue'
+import Terms from '@/views/Terms.vue'
+import Privacy from '@/views/Privacy.vue'
 
 const router = createRouter({
   history: createWebHistory(),
+  // Client-side page routes. API calls stay in services/views; this file only maps URLs to pages.
   routes: [
     {
       path: '/',
@@ -74,6 +77,16 @@ const router = createRouter({
       path: '/admin',
       name: 'Admin',
       component: AdminPage
+    },
+    {
+      path: '/privacy',
+      name: 'Privacy',
+      component: Privacy
+    },
+    {
+      path: '/Terms',
+      name: 'Terms',
+      component: Terms
     }
   ]
 })

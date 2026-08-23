@@ -78,6 +78,7 @@ const questions = ref([])
 
 const articleId = route.query.articleId
 
+// Pull the quiz questions for the article that sent the user here.
 onMounted(async () => {
   try {
     const response = await api.get(`/quiz/${articleId}`)
@@ -107,6 +108,8 @@ let timer = null
 const totalTime = ref(0)
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
+
+// Progress is based on the current question index rather than answered count.
 const progressPct = computed(() =>
   questions.value.length
     ? (currentIndex.value / questions.value.length) * 100
@@ -117,6 +120,7 @@ function formatTime(s) {
   return s < 10 ? `0:0${s}` : `0:${s}`
 }
 
+// Reset and run the per-question countdown.
 function startTimer() {
   clearInterval(timer)
   timeLeft.value = 30
@@ -134,6 +138,7 @@ function startTimer() {
   }, 1000)
 }
 
+// Lock the selected answer so each question can only be scored once.
 function selectAnswer(answer) {
   if (answered.value) return
 
@@ -147,6 +152,7 @@ function selectAnswer(answer) {
   }
 }
 
+// Drives the visual feedback for correct, incorrect, and non-selected answers.
 function optionClass(letter) {
   if (!answered.value) return ''
 
@@ -159,6 +165,7 @@ function optionClass(letter) {
   return 'option--dim'
 }
 
+// Move through the quiz until the final question, then persist the score.
 async function nextQuestion() {
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
@@ -171,6 +178,7 @@ async function nextQuestion() {
   }
 }
 
+// Store the result before routing to the summary screen.
 async function finishQuiz() {
   try {
     const response = await api.post('/updateResults', {

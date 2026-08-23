@@ -244,6 +244,7 @@ const loadTotals = ref({
   questions: 0
 })
 
+// Dashboard totals are loaded separately so the overview cards can refresh after deletes.
 async function loadTotalsData() {
     try{
         const response = await api.get('/count_all')
@@ -255,6 +256,7 @@ async function loadTotalsData() {
 
 const new_users = ref([])
 
+// Recent signups feed the overview table on the admin dashboard.
 async function loadRecentUsers() {
     try{
         const response = await api.get('/getTop6users')
@@ -267,6 +269,7 @@ async function loadRecentUsers() {
 
 const quizQuestions = ref([])
 
+// Quiz records are reused by the quiz tab and refreshed after quiz/article deletes.
 async function loadQuizzes() {
     try{
         const response = await api.get('/quizzes')
@@ -279,6 +282,7 @@ async function loadQuizzes() {
 
 const adminArticles = ref([])
 
+// Article records drive the admin article table and its local filters.
 async function loadArticles() {
     try{
         const response = await api.get('/articles')
@@ -297,6 +301,7 @@ const navItems = [
 
 
 const filteredAdminArticles = computed(() => {
+  // Keep search and category filtering client-side because the admin list is already loaded.
   return adminArticles.value.filter(a => {
     const matchSearch = a.title
       .toLowerCase()
@@ -308,12 +313,14 @@ const filteredAdminArticles = computed(() => {
 })
 
 const articleTags = computed(() => {
+  // Build the category dropdown from the article data returned by the API.
   const categories = adminArticles.value.map(a => a.category).filter(Boolean)
   return [...new Set(categories)]
 })
 
 const adminUsers = ref([])
 
+// Full user list powers the users tab, including ban actions and local search.
 async function loadUsers() {
     try{
         const response = await api.get('/users')
@@ -324,6 +331,7 @@ async function loadUsers() {
 }
 
 const filteredUsers = computed(() => {
+  // Search across the two identifiers admins are most likely to know.
   const q = userSearch.value.toLowerCase()
 
   return adminUsers.value.filter(u =>
@@ -334,6 +342,7 @@ const filteredUsers = computed(() => {
 })
 
 async function banUser(user) {
+  // The backend still verifies admin permission before applying the ban.
   if (!confirm(`Ban ${user.username}?`)) return
 
   try {
@@ -346,6 +355,7 @@ async function banUser(user) {
 }
 
 async function deleteArticle(article) {
+  // Deleting an article also removes linked quiz questions on the backend.
   if (!confirm(`Delete "${article.title}"? This will also remove its quizzes.`)) return
 
   try {
@@ -359,6 +369,7 @@ async function deleteArticle(article) {
 }
 
 async function deleteQuiz(quiz) {
+  // After deleting, refresh the quiz table and totals so counts stay accurate.
   if (!confirm('Delete this quiz question?')) return
 
   try {
@@ -371,6 +382,7 @@ async function deleteQuiz(quiz) {
 }
 
 onMounted(async () => {
+  // Load the independent admin panels together so the page fills quickly.
   await Promise.all([
     loadTotalsData(),
     loadRecentUsers(),

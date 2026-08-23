@@ -111,6 +111,7 @@ import { ref, onMounted } from 'vue'
 const showCookieNotice = ref(false)
 
 onMounted(() => {
+  // Only show the cookie message until the visitor accepts it once in this browser.
   const accepted = localStorage.getItem('cookieNoticeAccepted')
 
   if (!accepted) {
@@ -119,6 +120,7 @@ onMounted(() => {
 })
 
 const acceptCookies = () => {
+  // Store the acceptance locally because the notice is informational only.
   localStorage.setItem('cookieNoticeAccepted', 'true')
   showCookieNotice.value = false
 }

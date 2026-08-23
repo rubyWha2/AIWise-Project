@@ -67,6 +67,7 @@ const articleRef = ref(null)
 const readProgress = ref(0)
 const layoutRef = ref(null)
 
+// Fetch the specific article selected from the articles list using the route id.
 onMounted(async () => {
   try {
     const response = await api.get(`/articles/${route.params.id}`)
@@ -77,6 +78,7 @@ onMounted(async () => {
   }
 })
 
+// Preserve the article id so the quiz page can request matching questions.
 function goToQuiz() {
   router.push({
     path: '/quiz',
@@ -86,6 +88,7 @@ function goToQuiz() {
   })
 }
 
+// Calculate reading progress from the article's position in the viewport.
 function onScroll() {
   const el = articleRef.value
   if (!el) return

@@ -116,6 +116,7 @@ const activeSection = ref('information-we-collect')
 const contentRef = ref(null)
 const sectionRefs = ref([])
 
+// Privacy sections are data-driven so the content and side navigation use the same source.
 const sections = [
   {
     id: 'information-we-collect',
@@ -183,6 +184,7 @@ const sections = [
 ]
 
 const rights = [
+  // GDPR rights are kept separate because they render as highlighted cards.
   { title: 'Access', desc: 'Request a copy of the data we hold about you.' },
   { title: 'Correction', desc: 'Ask us to update or correct your information.' },
   { title: 'Deletion', desc: 'Request the removal of your data where legally possible.' },
@@ -192,11 +194,13 @@ const rights = [
 ]
 
 function scrollTo(id) {
+  // Smooth scrolling gives the table-of-contents links a clear page transition.
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   activeSection.value = id
 }
 
 function onScroll() {
+  // Update the active section as the user reads through the privacy page.
   const allIds = [...sections.map(s => s.id), 'your-rights', 'contact-us']
   for (const id of [...allIds].reverse()) {
     const el = document.getElementById(id)
@@ -207,7 +211,9 @@ function onScroll() {
   }
 }
 
+// Passive listener avoids blocking scrolling while still updating the side nav.
 onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
+// Remove the listener when this route is left.
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
 </script>
 

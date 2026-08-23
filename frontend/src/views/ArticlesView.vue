@@ -88,6 +88,7 @@ const tags = ['All', 'Data Protection', 'AI']
 
 const articles = ref([])
 
+// Load database-backed articles for the card grid.
 onMounted(async () => {
     try{
         const response = await api.get('/articles')
@@ -102,6 +103,7 @@ const loadDetails = ref({
   email: ''
 })
 
+// Load the signed-in user's display details for the sidebar card.
 onMounted(async () => {
     try{
         const response = await api.get('/loadDetails')
@@ -111,6 +113,7 @@ onMounted(async () => {
     }
 })
 
+// Search and category filtering stay local so the page feels fast after articles are loaded.
 const filteredArticles = computed(() => {
     return articles.value.filter(article => {
     const matchTag =
