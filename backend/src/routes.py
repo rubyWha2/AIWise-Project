@@ -595,17 +595,25 @@ def update_account():
 @main.route("/api/deleteAccount", methods=["POST"])
 @limiter.limit("3 per hour")
 def delete_account():
-    # Permanently remove the currently logged-in account.
+    # Permanently remove the currently logged-in account and their dependent quiz history.
     user_id = session.get("user_id")
 
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
 
     conn = get_db_connection()
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-    conn.commit()
-    conn.close()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM results WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    session.clear()
 
     return jsonify({
         "message": "Account deleted successfully",
