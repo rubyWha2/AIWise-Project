@@ -6,11 +6,13 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  // The backend project owns the .env file, so Vite explicitly reads those values too.
   const frontendEnv = loadEnv(mode, process.cwd(), '')
   const rootEnv = loadEnv(mode, fileURLToPath(new URL('..', import.meta.url)), '')
   const backendEnv = loadEnv(mode, fileURLToPath(new URL('../backend', import.meta.url)), '')
   const backendSrcEnv = loadEnv(mode, fileURLToPath(new URL('../backend/src', import.meta.url)), '')
   const recaptchaSiteKey =
+    // Prefer frontend-specific keys, then fall back to root/backend env files.
     frontendEnv.RECAPTCHA_SITE_KEY ||
     frontendEnv.VITE_RECAPTCHA_SITE_KEY ||
     rootEnv.RECAPTCHA_SITE_KEY ||

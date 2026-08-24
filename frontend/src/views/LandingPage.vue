@@ -32,17 +32,17 @@
       <div class="features-inner">
         <h2 class="section-title">How it works</h2>
         <div class="features-grid">
-          <router-link to="/articles" class="feature">
+          <router-link to="/login" class="feature">
             <div class="feature-num">01</div>
             <h3>Read an article</h3>
             <p>Browse our curated library across science, history, technology, and culture.</p>
           </router-link>
-          <router-link to="/quiz" class="feature">
+          <router-link to="/login" class="feature">
             <div class="feature-num">02</div>
             <h3>Take the quiz</h3>
             <p>Answer adaptive questions generated from the article's core concepts.</p>
           </router-link>
-          <router-link to="/dashboard" class="feature">
+          <router-link to="/login" class="feature">
             <div class="feature-num">03</div>
             <h3>Track your growth</h3>
             <p>See your scores improve and build a streak that keeps you coming back.</p>
@@ -60,14 +60,71 @@
 
     <footer class="footer">
       <div class="footer-inner">
+
         <span class="logo">AiWise</span>
+
+        <div class="footer-links">
+          <router-link to="/privacy">Privacy</router-link>
+        </div>
+        <div class="footer-links">
+          <router-link to="/Terms">Terms of Service </router-link>
+        </div>
         <span class="footer-copy">&copy; 2026 AiWise. All rights reserved.</span>
       </div>
     </footer>
+
+<!-- Cookie popup -->
+    <div
+      v-if="showCookieNotice"
+      class="cookie-overlay"
+    >
+      <div class="cookie-modal">
+
+        <div class="cookie-icon"></div>
+
+        <h2>Cookies on AIWise</h2>
+
+        <p>
+          AIWise uses an essential cookie to keep you signed in and provide
+          core account functionality.
+        </p>
+
+        <p class="cookie-small">
+          We do not use advertising cookies.
+        </p>
+
+        <button
+          class="cookie-btn"
+          @click="acceptCookies"
+        >
+          Got it
+        </button>
+
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+
+const showCookieNotice = ref(false)
+
+onMounted(() => {
+  // Only show the cookie message until the visitor accepts it once in this browser.
+  const accepted = localStorage.getItem('cookieNoticeAccepted')
+
+  if (!accepted) {
+    showCookieNotice.value = true
+  }
+})
+
+const acceptCookies = () => {
+  // Store the acceptance locally because the notice is informational only.
+  localStorage.setItem('cookieNoticeAccepted', 'true')
+  showCookieNotice.value = false
+}
+
 </script>
 
 <style scoped>
@@ -258,6 +315,84 @@
 .footer { border-top: 1px solid #e5e5e5; padding: 24px 32px; }
 .footer-inner { max-width: 1160px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
 .footer-copy { font-size: 13px; color: #aaa; }
+
+.cookie-overlay {
+  position: fixed;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(15, 15, 30, 0.55);
+
+  z-index: 9999;
+}
+
+.cookie-modal {
+  width: 90%;
+  max-width: 440px;
+
+  background: white;
+
+  padding: 32px;
+
+  border-radius: 16px;
+
+  text-align: center;
+
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.cookie-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.cookie-modal h2 {
+  margin: 0 0 12px;
+
+  color: #1e1b4b;
+
+  font-size: 22px;
+}
+
+.cookie-modal p {
+  color: #555;
+
+  font-size: 14px;
+  line-height: 1.6;
+
+  margin-bottom: 10px;
+}
+
+.cookie-small {
+  font-size: 12px !important;
+  color: #888 !important;
+}
+
+.cookie-btn {
+  margin-top: 16px;
+
+  width: 100%;
+
+  padding: 12px 20px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: #3730a3;
+  color: white;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.cookie-btn:hover {
+  background: #312e81;
+}
 
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }

@@ -14,6 +14,15 @@
         <router-link to="/account" class="nav-item nav-item--active">
           <span class="nav-icon">◯</span> Account
         </router-link>
+
+        <router-link
+            v-if="loadAdmin?.role_id === 1"
+            to="/admin"
+            class="nav-item"
+        >
+
+  <span class="nav-icon">⚙</span> Admin
+</router-link>
       </nav>
       <div class="sidebar-bottom">
         <div class="user-card">
@@ -200,13 +209,29 @@ const tabs = [
 
 const loadDetails = ref([])
 
+// Load the session user's account details for the sidebar and profile context.
 onMounted(async () => {
     try{
         const response = await api.get('/loadDetails')
         loadDetails.value = response.data
     } catch (error) {
-        console.error('Failed to load load users details', error)
+        console.error('Failed to load users details', error)
     }
+})
+
+const loadAdmin = ref(null)
+
+// Admin status controls whether the admin navigation link is visible.
+onMounted(async () => {
+  try {
+    const response = await api.get('/getAdminStatus')
+
+    console.log('Admin status:', response.data)
+
+    loadAdmin.value = response.data
+  } catch (error) {
+    console.error('Failed to load admin details', error)
+  }
 })
 
 const profile = reactive({
@@ -223,11 +248,13 @@ const prefs = reactive([
   { key: '2StepVerification', label: 'Enable  2-Step Verification', desc: "Add an extra layer of security by requiring a password and security question", value: true }
 ])
 
+// Shows a temporary saved message without changing persisted data by itself.
 function saveProfile() {
   profileSaved.value = true
   setTimeout(() => { profileSaved.value = false }, 3000)
 }
 
+// Validate editable profile fields before sending the update request.
 function validateUpdate() {
   let valid = true
 
@@ -258,6 +285,7 @@ function validateUpdate() {
   return valid
 }
 
+// Require a valid email before allowing account deletion confirmation to submit.
 function validateEmail() {
   let valid = true
 
@@ -274,6 +302,7 @@ function validateEmail() {
   return valid
 }
 
+// End the server session first, then clear browser-side storage and return home.
 async function handleLogout() {
   try {
   await api.post("/logout")
@@ -287,6 +316,7 @@ async function handleLogout() {
   }
 }
 
+// Ask the backend to generate and email a verification link for the current session user.
 async function handleVerifyEmail() {
   serverError.value = ''
   try {
@@ -305,6 +335,7 @@ async function handleVerifyEmail() {
   }
 }
 
+// Delete account uses the backend session; the email field is a user confirmation step.
 async function handleDeleteAccount() {
   console.log("Delete function called");
   if (!validateEmail()) return
@@ -332,6 +363,7 @@ async function handleDeleteAccount() {
   }
 }
 
+// Save profile edits through the backend and show short success feedback.
 async function handleUpdateAccount() {
   if (!validateUpdate()) return
   loading.value = true

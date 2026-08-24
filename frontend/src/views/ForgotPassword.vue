@@ -139,6 +139,7 @@ const perks = [
 const form = reactive({ email: '', oldPassword: '', newPassword: '', confirmPassword: '' })
 const errors = reactive({ email: '', oldPassword: '', newPassword: '', confirmPassword: '' })
 
+// Mirror the password rules visually so users can fix weak passwords before submitting.
 const pwStrength = computed(() => {
   const p = form.newPassword
   if (!p) return { level: 'none', pct: 0, label: '' }
@@ -154,6 +155,7 @@ const pwStrength = computed(() => {
 })
 
 function validate() {
+  // Keep validation on the page so the backend only receives complete reset requests.
   let valid = true
 
   Object.keys(errors).forEach(k => errors[k] = '')
@@ -222,6 +224,7 @@ async function handleReset() {
 
     if (recaptcha) {
       try {
+        // reCAPTCHA v3 is invisible; it creates a token instead of showing a checkbox popup.
         await recaptcha.recaptchaLoaded()
         token = await recaptcha.executeRecaptcha('change_password')
       } catch (recaptchaError) {
@@ -229,6 +232,7 @@ async function handleReset() {
       }
     }
 
+    // Send both the old and new passwords so the backend can confirm ownership.
     const response = await api.post('/changePassword', {
       email: form.email,
       oldPassword: form.oldPassword,
@@ -238,7 +242,7 @@ async function handleReset() {
     })
     console.log(response.data)
 
-    // Clear the form
+    // Clear the form after a successful password change.
     form.email = ''
     form.oldPassword = ''
     form.newPassword = ''
@@ -247,6 +251,7 @@ async function handleReset() {
     router.push('/login')
 
   } catch (e) {
+    // Prefer the backend message, then fall back to a connection-style error.
     console.log(e)
     if (e.response) {
       serverError.value = e.response.data.message

@@ -61,15 +61,18 @@ import api from '../services/api'
 
 const route = useRoute()
 
+// Quiz results arrive through query params from the quiz page.
 const correct = computed(() => Number(route.query.correct ?? 0))
 const total = computed(() => Number(route.query.maxScore ?? 0))
 const totalTime = computed(() => Number(route.query.totalTime ?? 0))
 
 const timeSpent = computed(() => {
+  // Show average time per question instead of the raw total seconds.
   if (total.value === 0) return 0
   return Math.round(totalTime.value / total.value)
 })
 
+// The circular score ring and feedback text all derive from the same percentage.
 const scorePercent = computed(() => Math.round((correct.value / total.value) * 100))
 const circumference = 2 * Math.PI * 52
 
@@ -84,6 +87,7 @@ const scoreColor = computed(() => {
 })
 
 const grade = computed(() => {
+  // Keep the grade thresholds aligned with the colour and headline feedback.
   if (scorePercent.value >= 90) return 'A'
   if (scorePercent.value >= 80) return 'B'
   if (scorePercent.value >= 70) return 'C'

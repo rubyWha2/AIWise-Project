@@ -89,6 +89,7 @@ const suggestions = [
 
 const loadDetails = ref([])
 
+// Sidebar user identity is loaded from the active session.
 onMounted(async () => {
     try{
         const response = await api.get('/loadDetails')
@@ -101,6 +102,7 @@ onMounted(async () => {
 
 const results = ref([])
 
+// Recent activity is based on saved quiz results for the current user.
 onMounted(async () => {
     try{
         const response = await api.get('/loadResults')
@@ -110,6 +112,7 @@ onMounted(async () => {
     }
 })
 
+// Convert raw result records into the compact activity items shown in the dashboard.
 const activity = computed(() => {
     return results.value.map(result => ({
         result_id: result.result_id,

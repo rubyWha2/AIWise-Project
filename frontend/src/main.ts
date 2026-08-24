@@ -8,6 +8,7 @@ import router from './router'
 const app = createApp(App)
 app.use(router)
 
+// reCAPTCHA is optional in local development; the backend also has a debug fallback.
 const recaptchaSiteKey = import.meta.env.RECAPTCHA_SITE_KEY
 
 if (recaptchaSiteKey) {

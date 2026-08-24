@@ -29,40 +29,58 @@
       <section v-if="activeSection === 'overview'">
         <h1 class="page-title">Overview</h1>
         <div class="stats-row">
-          <div class="stat-card" v-for="s in siteStats" :key="s.label">
-            <div class="stat-value">{{ s.value }}</div>
-            <div class="stat-label">{{ s.label }}</div>
-          </div>
+          <div class="stat-card">
+    <div class="stat-value">
+      {{ loadTotals.users }}
+    </div>
+    <div class="stat-label">
+      Users
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-value">
+      {{ loadTotals.articles }}
+    </div>
+    <div class="stat-label">
+      Articles
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-value">
+      {{ loadTotals.quizzes_taken }}
+    </div>
+    <div class="stat-label">
+      Quizzes taken
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-value">
+      {{ loadTotals.questions }}
+    </div>
+    <div class="stat-label">
+      Quiz questions
+    </div>
+  </div>
+
         </div>
-        <div class="overview-grid">
+        <div class="overview-grid overview-grid--dark-text">
           <div class="panel">
             <h2>Recent signups</h2>
             <table class="data-table">
               <thead>
-                <tr><th>Name</th><th>Email</th><th>Joined</th><th>Quizzes</th></tr>
+                <tr><th>Name</th><th>Email</th><th>Joined</th></tr>
               </thead>
               <tbody>
-                <tr v-for="u in recentUsers" :key="u.email">
-                  <td><strong>{{ u.name }}</strong></td>
+                <tr v-for="u in new_users" :key="u.email">
+                  <td><strong>{{ u.username }}</strong></td>
                   <td class="muted">{{ u.email }}</td>
-                  <td class="muted">{{ u.joined }}</td>
-                  <td>{{ u.quizzes }}</td>
+                  <td class="muted">{{ u.created_at }}</td>
                 </tr>
               </tbody>
             </table>
-          </div>
-          <div class="panel">
-            <h2>Top articles</h2>
-            <div class="top-list">
-              <div class="top-item" v-for="(a, i) in topArticles" :key="a.title">
-                <span class="top-rank">{{ i + 1 }}</span>
-                <div class="top-body">
-                  <div class="top-title">{{ a.title }}</div>
-                  <div class="top-meta">{{ a.views }} views · {{ a.quizzes }} quizzes taken</div>
-                </div>
-                <div class="top-score">{{ a.avgScore }}%</div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -71,7 +89,6 @@
       <section v-if="activeSection === 'articles'">
         <div class="section-header">
           <h1 class="page-title">Articles</h1>
-          <button class="btn-primary" @click="showArticleModal = true">+ New article</button>
         </div>
         <div class="panel">
           <div class="table-toolbar">
@@ -83,19 +100,16 @@
           </div>
           <table class="data-table">
             <thead>
-              <tr><th>Title</th><th>Tag</th><th>Status</th><th>Views</th><th>Avg score</th><th></th></tr>
+              <tr><th>Title</th><th>Tag</th><th></th></tr>
             </thead>
             <tbody>
-              <tr v-for="a in filteredAdminArticles" :key="a.id">
+              <tr v-for="a in filteredAdminArticles" :key="a.article_id">
                 <td><strong>{{ a.title }}</strong></td>
-                <td><span class="tag-chip">{{ a.tag }}</span></td>
-                <td><span class="status-chip" :class="`status-chip--${a.status}`">{{ a.status }}</span></td>
-                <td class="muted">{{ a.views }}</td>
-                <td>{{ a.avgScore }}%</td>
+                <td><span class="tag-chip">{{ a.category }}</span></td>
                 <td>
                   <div class="row-actions">
                     <button class="row-btn">Edit</button>
-                    <button class="row-btn row-btn--danger">Delete</button>
+                    <button class="row-btn row-btn--danger" @click="deleteArticle(a)">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -114,25 +128,37 @@
           <input v-model="userSearch" class="search-input" type="text" placeholder="Search users by name or email…" style="margin-bottom: 16px" />
           <table class="data-table">
             <thead>
-              <tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Quizzes</th><th>Avg score</th><th></th></tr>
+              <tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th></th></tr>
             </thead>
             <tbody>
               <tr v-for="u in filteredUsers" :key="u.email">
                 <td>
                   <div class="user-cell">
-                    <div class="user-avatar">{{ u.name.split(' ').map(n => n[0]).join('') }}</div>
-                    <strong>{{ u.name }}</strong>
+                    <div class="user-avatar">{{ u.username.split(' ').map(n => n[0]).join('') }}</div>
+                    <strong>{{ u.username }}</strong>
                   </div>
                 </td>
                 <td class="muted">{{ u.email }}</td>
-                <td><span class="role-chip" :class="`role-chip--${u.role}`">{{ u.role }}</span></td>
-                <td class="muted">{{ u.joined }}</td>
-                <td>{{ u.quizzes }}</td>
-                <td>{{ u.avgScore }}%</td>
+                <td>
+                    <span
+                        class="role-chip"
+                        :class="u.role_id === 1 ? 'role-chip--admin' : 'role-chip--user'"
+                    >
+                        {{ u.banned ? 'Banned' : u.role_id === 1 ? 'Admin' : 'User' }}
+                    </span>
+                </td>
+
+                <td class="muted">{{ u.created_at }}</td>
                 <td>
                   <div class="row-actions">
                     <button class="row-btn">View</button>
-                    <button class="row-btn row-btn--danger">Ban</button>
+                    <button
+                      class="row-btn row-btn--danger"
+                      :disabled="u.banned"
+                      @click="banUser(u)"
+                    >
+                      {{ u.banned ? 'Banned' : 'Ban' }}
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -145,30 +171,20 @@
       <section v-if="activeSection === 'quizzes'">
         <div class="section-header">
           <h1 class="page-title">Quiz questions</h1>
-          <button class="btn-primary">+ New question</button>
         </div>
         <div class="panel">
           <table class="data-table">
             <thead>
-              <tr><th>Question</th><th>Article</th><th>Difficulty</th><th>Correct rate</th><th></th></tr>
+              <tr><th>Question</th><th>Article</th><th></th></tr>
             </thead>
             <tbody>
-              <tr v-for="q in quizQuestions" :key="q.id">
-                <td class="question-cell">{{ q.text }}</td>
-                <td class="muted">{{ q.article }}</td>
-                <td><span class="diff-chip" :class="`diff-chip--${q.difficulty}`">{{ q.difficulty }}</span></td>
-                <td>
-                  <div class="correct-bar-wrap">
-                    <div class="correct-bar">
-                      <div class="correct-fill" :style="{ width: q.correctRate + '%', background: correctColor(q.correctRate) }"></div>
-                    </div>
-                    <span>{{ q.correctRate }}%</span>
-                  </div>
-                </td>
+              <tr v-for="q in quizQuestions" :key="q.quiz_id">
+                <td class="question-cell">{{ q.question }}</td>
+                <td class="muted">{{ q.title }}</td>
                 <td>
                   <div class="row-actions">
                     <button class="row-btn">Edit</button>
-                    <button class="row-btn row-btn--danger">Delete</button>
+                    <button class="row-btn row-btn--danger" @click="deleteQuiz(q)">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -212,13 +228,69 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import api from '../services/api'
 
 const activeSection = ref('overview')
 const showArticleModal = ref(false)
 const articleSearch = ref('')
 const articleFilter = ref('')
 const userSearch = ref('')
+
+const loadTotals = ref({
+  users: 0,
+  articles: 0,
+  quizzes_taken: 0,
+  questions: 0
+})
+
+// Dashboard totals are loaded separately so the overview cards can refresh after deletes.
+async function loadTotalsData() {
+    try{
+        const response = await api.get('/count_all')
+        loadTotals.value = response.data
+    } catch (error) {
+        console.error('Failed to load totals', error)
+    }
+}
+
+const new_users = ref([])
+
+// Recent signups feed the overview table on the admin dashboard.
+async function loadRecentUsers() {
+    try{
+        const response = await api.get('/getTop6users')
+        new_users.value = response.data
+    } catch (error) {
+        console.error('Failed to load users details', error)
+    }
+}
+
+
+const quizQuestions = ref([])
+
+// Quiz records are reused by the quiz tab and refreshed after quiz/article deletes.
+async function loadQuizzes() {
+    try{
+        const response = await api.get('/quizzes')
+        quizQuestions.value = response.data
+    } catch (error) {
+        console.error('Failed to load quizzes', error)
+    }
+}
+
+
+const adminArticles = ref([])
+
+// Article records drive the admin article table and its local filters.
+async function loadArticles() {
+    try{
+        const response = await api.get('/articles')
+        adminArticles.value = response.data
+    } catch (error) {
+        console.error('Failed to load articles', error)
+    }
+}
 
 const navItems = [
   { key: 'overview', icon: '⊞', label: 'Overview' },
@@ -227,67 +299,98 @@ const navItems = [
   { key: 'quizzes', icon: '✦', label: 'Quiz questions' },
 ]
 
-const siteStats = [
-  { label: 'Total users', value: '12,481' },
-  { label: 'Articles published', value: '348' },
-  { label: 'Quizzes taken today', value: '1,204' },
-  { label: 'Avg. score (30d)', value: '79%' },
-]
-
-const recentUsers = [
-  { name: 'Priya Nair', email: 'priya@example.com', joined: 'Jun 23, 2025', quizzes: 2 },
-  { name: 'Tom Becker', email: 'tom@example.com', joined: 'Jun 22, 2025', quizzes: 7 },
-  { name: 'Sofia Melo', email: 'sofia@example.com', joined: 'Jun 22, 2025', quizzes: 4 },
-  { name: 'James Park', email: 'james@example.com', joined: 'Jun 21, 2025', quizzes: 11 },
-  { name: 'Aiko Tanaka', email: 'aiko@example.com', joined: 'Jun 20, 2025', quizzes: 3 },
-]
-
-const topArticles = [
-  { title: 'How Large Language Models Work', views: 8420, quizzes: 3102, avgScore: 74 },
-  { title: 'The Fall of Constantinople', views: 6710, quizzes: 2488, avgScore: 81 },
-  { title: 'What Happens When You Sleep', views: 5990, quizzes: 2310, avgScore: 88 },
-  { title: 'The Secret Life of Mitochondria', views: 4830, quizzes: 1902, avgScore: 76 },
-]
-
-const articleTags = ['Science', 'History', 'Technology', 'Culture', 'Health']
-
-const adminArticles = [
-  { id: 1, title: 'How Large Language Models Work', tag: 'Technology', status: 'published', views: 8420, avgScore: 74 },
-  { id: 2, title: 'The Fall of Constantinople', tag: 'History', status: 'published', views: 6710, avgScore: 81 },
-  { id: 3, title: 'The Philosophy of Boredom', tag: 'Culture', status: 'published', views: 3210, avgScore: 69 },
-  { id: 4, title: 'CRISPR: Gene Editing Explained', tag: 'Science', status: 'draft', views: 0, avgScore: 0 },
-  { id: 5, title: 'The Quantum Internet', tag: 'Technology', status: 'draft', views: 0, avgScore: 0 },
-]
 
 const filteredAdminArticles = computed(() => {
-  return adminArticles.filter(a => {
-    const matchSearch = !articleSearch.value || a.title.toLowerCase().includes(articleSearch.value.toLowerCase())
-    const matchTag = !articleFilter.value || a.tag === articleFilter.value
+  // Keep search and category filtering client-side because the admin list is already loaded.
+  return adminArticles.value.filter(a => {
+    const matchSearch = a.title
+      .toLowerCase()
+      .includes(articleSearch.value.toLowerCase())
+    const matchTag = !articleFilter.value || a.category === articleFilter.value
+
     return matchSearch && matchTag
   })
 })
 
-const adminUsers = [
-  { name: 'Alex Rivera', email: 'alex@example.com', role: 'admin', joined: 'Jan 3, 2025', quizzes: 47, avgScore: 82 },
-  { name: 'Priya Nair', email: 'priya@example.com', role: 'user', joined: 'Jun 23, 2025', quizzes: 2, avgScore: 71 },
-  { name: 'Tom Becker', email: 'tom@example.com', role: 'user', joined: 'Jun 22, 2025', quizzes: 7, avgScore: 78 },
-  { name: 'Sofia Melo', email: 'sofia@example.com', role: 'user', joined: 'Jun 22, 2025', quizzes: 4, avgScore: 65 },
-  { name: 'James Park', email: 'james@example.com', role: 'user', joined: 'Jun 21, 2025', quizzes: 11, avgScore: 90 },
-  { name: 'Aiko Tanaka', email: 'aiko@example.com', role: 'user', joined: 'Jun 20, 2025', quizzes: 3, avgScore: 55 },
-]
-
-const filteredUsers = computed(() => {
-  const q = userSearch.value.toLowerCase()
-  return adminUsers.filter(u => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+const articleTags = computed(() => {
+  // Build the category dropdown from the article data returned by the API.
+  const categories = adminArticles.value.map(a => a.category).filter(Boolean)
+  return [...new Set(categories)]
 })
 
-const quizQuestions = [
-  { id: 1, text: 'In what year did Constantinople fall to Ottoman forces?', article: 'The Fall of Constantinople', difficulty: 'easy', correctRate: 88 },
-  { id: 2, text: 'Which emperor ruled during the fall of Constantinople?', article: 'The Fall of Constantinople', difficulty: 'medium', correctRate: 61 },
-  { id: 3, text: 'What is the primary function of the transformer architecture in LLMs?', article: 'How Large Language Models Work', difficulty: 'hard', correctRate: 44 },
-  { id: 4, text: 'What stage of sleep is most associated with memory consolidation?', article: 'What Happens When You Sleep', difficulty: 'medium', correctRate: 72 },
-  { id: 5, text: 'What bacterial system inspired CRISPR gene editing?', article: 'CRISPR: Gene Editing Explained', difficulty: 'hard', correctRate: 38 },
-]
+const adminUsers = ref([])
+
+// Full user list powers the users tab, including ban actions and local search.
+async function loadUsers() {
+    try{
+        const response = await api.get('/users')
+        adminUsers.value = response.data
+    } catch (error) {
+        console.error('Failed to load load users details', error)
+    }
+}
+
+const filteredUsers = computed(() => {
+  // Search across the two identifiers admins are most likely to know.
+  const q = userSearch.value.toLowerCase()
+
+  return adminUsers.value.filter(u =>
+    !q ||
+    u.username.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q)
+  )
+})
+
+async function banUser(user) {
+  // The backend still verifies admin permission before applying the ban.
+  if (!confirm(`Ban ${user.username}?`)) return
+
+  try {
+    await api.put(`/users/${user.user_id}/ban`)
+    await loadUsers()
+    await loadRecentUsers()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to ban user.')
+  }
+}
+
+async function deleteArticle(article) {
+  // Deleting an article also removes linked quiz questions on the backend.
+  if (!confirm(`Delete "${article.title}"? This will also remove its quizzes.`)) return
+
+  try {
+    await api.delete(`/articles/${article.article_id}`)
+    await loadArticles()
+    await loadQuizzes()
+    await loadTotalsData()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to delete article.')
+  }
+}
+
+async function deleteQuiz(quiz) {
+  // After deleting, refresh the quiz table and totals so counts stay accurate.
+  if (!confirm('Delete this quiz question?')) return
+
+  try {
+    await api.delete(`/quizzes/${quiz.quiz_id}`)
+    await loadQuizzes()
+    await loadTotalsData()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Failed to delete quiz question.')
+  }
+}
+
+onMounted(async () => {
+  // Load the independent admin panels together so the page fills quickly.
+  await Promise.all([
+    loadTotalsData(),
+    loadRecentUsers(),
+    loadQuizzes(),
+    loadArticles(),
+    loadUsers(),
+  ])
+})
 
 function correctColor(rate) {
   if (rate >= 75) return '#10b981'
@@ -344,6 +447,16 @@ function correctColor(rate) {
 
 /* Overview grid */
 .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.overview-grid--dark-text .panel h2,
+.overview-grid--dark-text .data-table th,
+.overview-grid--dark-text .data-table td,
+.overview-grid--dark-text .muted,
+.overview-grid--dark-text .top-rank,
+.overview-grid--dark-text .top-title,
+.overview-grid--dark-text .top-meta,
+.overview-grid--dark-text .top-score {
+  color: #0f0f0f;
+}
 
 /* Panel */
 .panel { background: #fff; border-radius: 12px; border: 1px solid #e5e5e5; padding: 24px; margin-bottom: 20px; }
@@ -353,40 +466,41 @@ function correctColor(rate) {
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th {
   text-align: left; padding: 0 12px 12px; font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.5px; color: #aaa;
+  text-transform: uppercase; letter-spacing: 0.5px; color: #0f0f0f;
   border-bottom: 1px solid #f0f0f0;
 }
-.data-table td { padding: 13px 12px; border-bottom: 1px solid #f8f8f8; vertical-align: middle; }
+.data-table td { padding: 13px 12px; border-bottom: 1px solid #f8f8f8; vertical-align: middle; color: #0f0f0f; }
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr:hover { background: #fafaf8; }
-.muted { color: #999; }
+.muted { color: #0f0f0f; }
 .question-cell { max-width: 320px; }
 
 /* Chips */
 .tag-chip {
-  background: #ede9fe; color: #5b21b6; font-size: 11px; font-weight: 600;
+  background: #ede9fe; color: #0f0f0f; font-size: 11px; font-weight: 600;
   padding: 3px 8px; border-radius: 4px; letter-spacing: 0.3px;
 }
 .status-chip { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
-.status-chip--published { background: #dcfce7; color: #15803d; }
-.status-chip--draft { background: #f3f4f6; color: #6b7280; }
+.status-chip--published { background: #dcfce7; color: #0f0f0f; }
+.status-chip--draft { background: #f3f4f6; color: #0f0f0f; }
 .role-chip { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
-.role-chip--admin { background: #ede9fe; color: #5b21b6; }
-.role-chip--user { background: #f3f4f6; color: #6b7280; }
+.role-chip--admin { background: #ede9fe; color: #0f0f0f; }
+.role-chip--user { background: #f3f4f6; color: #0f0f0f; }
 .diff-chip { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
-.diff-chip--easy { background: #dcfce7; color: #15803d; }
-.diff-chip--medium { background: #fef9c3; color: #854d0e; }
-.diff-chip--hard { background: #fee2e2; color: #991b1b; }
+.diff-chip--easy { background: #dcfce7; color: #0f0f0f; }
+.diff-chip--medium { background: #fef9c3; color: #0f0f0f; }
+.diff-chip--hard { background: #fee2e2; color: #0f0f0f; }
 
 /* Row actions */
 .row-actions { display: flex; gap: 6px; }
 .row-btn {
   padding: 4px 10px; border-radius: 6px; border: 1px solid #e5e5e5;
-  background: #fff; font-size: 12px; font-weight: 600; color: #555; cursor: pointer; transition: all 0.15s;
+  background: #fff; font-size: 12px; font-weight: 600; color: #0f0f0f; cursor: pointer; transition: all 0.15s;
 }
-.row-btn:hover { border-color: #3730a3; color: #3730a3; }
-.row-btn--danger { color: #dc2626; }
-.row-btn--danger:hover { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+.row-btn:hover:not(:disabled) { border-color: #3730a3; color: #3730a3; }
+.row-btn--danger { color: #0f0f0f; }
+.row-btn--danger:hover:not(:disabled) { border-color: #dc2626; color: #dc2626; background: #fef2f2; }
+.row-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* User cell */
 .user-cell { display: flex; align-items: center; gap: 10px; }

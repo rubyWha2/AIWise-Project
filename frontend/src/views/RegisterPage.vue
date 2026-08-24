@@ -70,7 +70,9 @@
 
           <p class="terms">
             By signing up, you agree to our
-            <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+            <router-link to="/Terms">Terms of Use</router-link>
+            and
+            <router-link to="/Privacy">Privacy Policy</router-link>.
           </p>
 
           <p v-if="serverError" class="server-error">{{ serverError }}</p>
@@ -104,6 +106,7 @@ const perks = [
 const form = reactive({ firstName: '', lastName: '', email: '', password: '' })
 const errors = reactive({ firstName: '', lastName: '', email: '', password: '' })
 
+// Gives immediate password feedback before the backend enforces the same password policy.
 const pwStrength = computed(() => {
   const p = form.password
   if (!p) return { level: 'none', pct: 0, label: '' }
@@ -118,6 +121,7 @@ const pwStrength = computed(() => {
   return { level: levels[score], pct: (score / 4) * 100, label: labels[score] }
 })
 
+// Mirrors the backend registration rules so users can fix form errors before submitting.
 function validate() {
   let valid = true
 
@@ -166,6 +170,7 @@ async function handleRegister() {
   loading.value = true
   serverError.value = ''
   try {
+    // Registration stores the account server-side; this page only sends the fields the API expects.
     const response = await api.post('/register', {
       firstName: form.firstName,
       lastName: form.lastName,
@@ -174,7 +179,7 @@ async function handleRegister() {
     })
     console.log(response.data)
 
-    // Clear the form
+    // Clear the form after a successful registration so stale details are not left in memory.
     form.firstName = ''
     form.lastName = ''
     form.email = ''

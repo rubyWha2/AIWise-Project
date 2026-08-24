@@ -79,6 +79,7 @@ const serverError = ref('')
 const form = reactive({ email: '', password: '' })
 const errors = reactive({ email: '', password: '' })
 
+// Keep client-side validation small; the backend still performs the real auth checks.
 function validate() {
   errors.email = ''
   errors.password = ''
@@ -96,6 +97,7 @@ async function handleLogin() {
   try {
     let token = ''
 
+    // reCAPTCHA v3 runs invisibly; if local setup cannot create a token, the backend decides whether to allow debug fallback.
     if (recaptcha) {
       try {
         await recaptcha.recaptchaLoaded()
@@ -105,6 +107,7 @@ async function handleLogin() {
       }
     }
 
+    // Send credentials through the shared API client so session cookies are included consistently.
     const response = await api.post('/login', {
       email: form.email,
       password: form.password,
@@ -115,6 +118,7 @@ async function handleLogin() {
     router.push('/dashboard')
 
   } catch (e) {
+    // Surface backend messages where possible so lockout, ban, and rate-limit states are visible to the user.
     if (e.response?.status === 429) {
       serverError.value = 'Too many login attempts. Please wait a minute and try again.'
     } else {
