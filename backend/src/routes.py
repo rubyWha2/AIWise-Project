@@ -636,7 +636,7 @@ def sendVerificationEmail():
 
     token = secrets.token_urlsafe(32)
     verification_link = f"http://localhost:5173/verify-email?token={token}"
-    expiry = datetime.utcnow() + timedelta(hours=24)
+    expiry = datetime.now(timezone.utc) + timedelta(hours=24)
 
     conn = get_db_connection()
 
