@@ -28,14 +28,22 @@ def login_rate_limit_key():
 
 def verify_recaptcha_token(token, action):
     # Shared server-side verifier for invisible reCAPTCHA v3 actions.
-    secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
+    secret_key = (os.getenv("RECAPTCHA_SECRET_KEY") or "").strip()
+    placeholder_secret = secret_key.lower().startswith(("your_", "placeholder")) or secret_key.lower() in {
+        "secret_key_here",
+        "recaptcha_secret_key",
+    }
 
-    if current_app.debug and not secret_key:
-        # Local development can continue without Google verification when no secret is configured.
+    if current_app.debug and (not secret_key or placeholder_secret):
+        # Local development can continue without Google verification when no usable secret is configured.
         return True, "", 200
 
-    if not secret_key:
+    if not secret_key or placeholder_secret:
         return False, "reCAPTCHA secret key is not configured", 500
+
+    if current_app.debug and not token:
+        # Keep local login usable when the browser cannot create a reCAPTCHA token.
+        return True, "", 200
 
     if not token:
         return False, "Recaptcha token is required", 400
@@ -47,10 +55,12 @@ def verify_recaptcha_token(token, action):
                 "secret": secret_key,
                 "response": token
             },
-            timeout=5
+            timeout=2
         )
         recaptcha_response.raise_for_status()
     except requests.RequestException:
+        if current_app.debug:
+            return True, "", 200
         return False, "Could not verify reCAPTCHA. Check the backend internet connection and secret key.", 503
 
     recaptcha_result = recaptcha_response.json()

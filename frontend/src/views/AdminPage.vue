@@ -2,7 +2,7 @@
   <div class="admin-layout">
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <router-link to="/" class="logo">Quizly</router-link>
+        <router-link to="/" class="logo">AiWise</router-link>
         <span class="admin-badge">Admin</span>
       </div>
       <nav class="sidebar-nav">

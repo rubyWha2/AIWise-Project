@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
     backendSrcEnv.RECAPTCHA_SITE_KEY ||
     backendSrcEnv.VITE_RECAPTCHA_SITE_KEY ||
     ''
+  const isPlaceholderKey = /^(your_|placeholder|site_key_here|secret_key_here)/i.test(recaptchaSiteKey)
 
   return {
     plugins: [
@@ -29,7 +30,7 @@ export default defineConfig(({ mode }) => {
       vueDevTools(),
     ],
     define: {
-      'import.meta.env.RECAPTCHA_SITE_KEY': JSON.stringify(recaptchaSiteKey),
+      'import.meta.env.RECAPTCHA_SITE_KEY': JSON.stringify(isPlaceholderKey ? '' : recaptchaSiteKey),
     },
     resolve: {
       alias: {
