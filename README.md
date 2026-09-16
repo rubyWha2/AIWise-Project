@@ -157,8 +157,9 @@ Start Vite:
 The application requires environment variables for configuration and
 sensitive credentials.
 
-An `.env.example` file is provided showing the required variables without
-containing real credentials.
+The backend environment template is available at `backend/src/.env.example`.
+Copy it to `backend/src/.env` and replace the placeholder values with your
+local credentials. Do not commit real secrets.
 
 ## Deployment
 

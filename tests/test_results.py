@@ -6,8 +6,9 @@ from tests.test_helpers import FakeConnection, FakeCursor, login_as
 
 def test_get_results_returns_all_results(client, monkeypatch):
     created_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
-    cursor = FakeCursor(fetchall=[(1, 2, 3, 4, 5, created_at)])
+    cursor = FakeCursor(fetchone=[(1,)], fetchall=[(1, 2, 3, 4, 5, created_at)])
     monkeypatch.setattr(routes, "get_db_connection", lambda: FakeConnection(cursor))
+    login_as(client)
 
     response = client.get("/api/results")
 

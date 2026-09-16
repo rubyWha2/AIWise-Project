@@ -12,26 +12,29 @@ def test_count_all_requires_login(client):
 
 
 def test_get_roles_returns_roles(client, monkeypatch):
-    cursor = FakeCursor(fetchall=[(1, "admin", True), (2, "user", False)])
+    cursor = FakeCursor(fetchone=[(1,)], fetchall=[(1, "admin", True), (2, "user", False)])
     monkeypatch.setattr(routes, "get_db_connection", lambda: FakeConnection(cursor))
+    login_as(client)
 
     response = client.get("/api/roles")
 
     assert response.status_code == 200
     assert response.get_json()[0]["name"] == "admin"
-    assert response.get_json()[1]["privilged"] is False
+    assert response.get_json()[1]["privileged"] is False
 
 
 def test_get_users_returns_users(client, monkeypatch):
     created_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
-    cursor = FakeCursor(fetchall=[(1, "admin1", "admin@aiwise.com", "hash", 1, created_at, False)])
+    cursor = FakeCursor(fetchone=[(1,)], fetchall=[(1, "admin1", "admin@aiwise.com", 1, created_at, False)])
     monkeypatch.setattr(routes, "get_db_connection", lambda: FakeConnection(cursor))
+    login_as(client)
 
     response = client.get("/api/users")
 
     assert response.status_code == 200
     assert response.get_json()[0]["username"] == "admin1"
     assert response.get_json()[0]["banned"] is False
+    assert "password_hash" not in response.get_json()[0]
 
 
 def test_get_admin_status_returns_403_for_non_admin(client, monkeypatch):
@@ -57,7 +60,7 @@ def test_get_admin_status_returns_admin(client, monkeypatch):
 
 
 def test_count_all_returns_dashboard_totals(client, monkeypatch):
-    cursor = FakeCursor(fetchone=[(3, 9, 12, 20)])
+    cursor = FakeCursor(fetchone=[(1,), (3, 9, 12, 20)])
     monkeypatch.setattr(routes, "get_db_connection", lambda: FakeConnection(cursor))
     login_as(client)
 
@@ -74,8 +77,9 @@ def test_count_all_returns_dashboard_totals(client, monkeypatch):
 
 def test_get_top_6_users_returns_recent_users(client, monkeypatch):
     created_at = datetime(2026, 9, 8, tzinfo=timezone.utc)
-    cursor = FakeCursor(fetchall=[(1, "admin1", "admin@aiwise.com", created_at)])
+    cursor = FakeCursor(fetchone=[(1,)], fetchall=[(1, "admin1", "admin@aiwise.com", created_at)])
     monkeypatch.setattr(routes, "get_db_connection", lambda: FakeConnection(cursor))
+    login_as(client)
 
     response = client.get("/api/getTop6users")
 
