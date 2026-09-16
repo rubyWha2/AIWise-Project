@@ -12,3 +12,4 @@ ruff
 psycopg[binary]
 flask_limiter
 Flask-Mail
+gunicorn
