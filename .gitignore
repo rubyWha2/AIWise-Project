@@ -1,0 +1,39 @@
+# --------------------
+# Environment / secrets
+# --------------------
+.env
+.env.*
+!.env.example
+
+# --------------------
+# Python
+# --------------------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# --------------------
+# Node / Vue
+# --------------------
+node_modules/
+dist/
+
+# --------------------
+# IDE
+# --------------------
+.idea/
+
+# --------------------
+# OS
+# --------------------
+.DS_Store
+Thumbs.db
+
+# --------------------
+# Test coverage
+# --------------------
+.coverage
+htmlcov/
+coverage/

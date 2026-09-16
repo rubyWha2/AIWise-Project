@@ -79,6 +79,15 @@ const serverError = ref('')
 const form = reactive({ email: '', password: '' })
 const errors = reactive({ email: '', password: '' })
 
+function withTimeout(promise, milliseconds) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('reCAPTCHA timed out')), milliseconds)
+    })
+  ])
+}
+
 // Keep client-side validation small; the backend still performs the real auth checks.
 function validate() {
   errors.email = ''
@@ -100,8 +109,8 @@ async function handleLogin() {
     // reCAPTCHA v3 runs invisibly; if local setup cannot create a token, the backend decides whether to allow debug fallback.
     if (recaptcha) {
       try {
-        await recaptcha.recaptchaLoaded()
-        token = await recaptcha.executeRecaptcha('login')
+        await withTimeout(recaptcha.recaptchaLoaded(), 2500)
+        token = await withTimeout(recaptcha.executeRecaptcha('login'), 2500)
       } catch (recaptchaError) {
         console.warn('reCAPTCHA could not create a token:', recaptchaError)
       }

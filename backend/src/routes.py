@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection
 from dotenv import load_dotenv
 from . import limiter
+from pathlib import Path
 import re
 import requests
 import os
@@ -15,7 +16,8 @@ import secrets
 from . import mail
 from flask_mail import Message
 
-load_dotenv()
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH, override=True)
 PEPPER = os.getenv("PASSWORD_PEPPER", "")
 
 main = Blueprint('main', __name__)
@@ -28,14 +30,22 @@ def login_rate_limit_key():
 
 def verify_recaptcha_token(token, action):
     # Shared server-side verifier for invisible reCAPTCHA v3 actions.
-    secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
+    secret_key = (os.getenv("RECAPTCHA_SECRET_KEY") or "").strip()
+    placeholder_secret = secret_key.lower().startswith(("your_", "placeholder")) or secret_key.lower() in {
+        "secret_key_here",
+        "recaptcha_secret_key",
+    }
 
-    if current_app.debug and not secret_key:
-        # Local development can continue without Google verification when no secret is configured.
+    if current_app.debug and (not secret_key or placeholder_secret):
+        # Local development can continue without Google verification when no usable secret is configured.
         return True, "", 200
 
-    if not secret_key:
+    if not secret_key or placeholder_secret:
         return False, "reCAPTCHA secret key is not configured", 500
+
+    if current_app.debug and not token:
+        # Keep local login usable when the browser cannot create a reCAPTCHA token.
+        return True, "", 200
 
     if not token:
         return False, "Recaptcha token is required", 400
@@ -47,10 +57,12 @@ def verify_recaptcha_token(token, action):
                 "secret": secret_key,
                 "response": token
             },
-            timeout=5
+            timeout=2
         )
         recaptcha_response.raise_for_status()
     except requests.RequestException:
+        if current_app.debug:
+            return True, "", 200
         return False, "Could not verify reCAPTCHA. Check the backend internet connection and secret key.", 503
 
     recaptcha_result = recaptcha_response.json()
@@ -59,9 +71,7 @@ def verify_recaptcha_token(token, action):
         return False, "reCAPTCHA verification failed", 400
 
     actual_action = recaptcha_result.get("action")
-
-    print("Actual action:", actual_action)
-    print("Expected action:", action)
+    current_app.logger.debug("reCAPTCHA action %s, expected %s", actual_action, action)
 
     if recaptcha_result.get("action") != action:
         return False, "Invalid reCAPTCHA action", 400
@@ -90,6 +100,15 @@ def current_user_is_admin():
     conn.close()
 
     return bool(admin and admin[0] == 1)
+
+def require_admin():
+    if not session.get("user_id"):
+        return jsonify({"message": "Please log in"}), 401
+
+    if not current_user_is_admin():
+        return jsonify({"message": "Admin access required"}), 403
+
+    return None
 
 @main.route('/api/test')
 def test():
@@ -248,6 +267,10 @@ def get_inv_quiz(article_id):
 @main.route("/api/results", methods=["GET"])
 def get_results():
     # Raw quiz results endpoint for administrative views.
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -278,6 +301,10 @@ def get_results():
 
 @main.route("/api/roles", methods=["GET"])
 def get_roles():
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -297,18 +324,22 @@ def get_roles():
         roles.append({
             "role_id": row[0],
             "name": row[1],
-            "privilged": row[2]
+            "privileged": row[2]
         })
 
     return jsonify(roles)
 
 @main.route("/api/users", methods=["GET"])
 def get_users():
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+
     conn = get_db_connection()
 
     with conn.cursor() as cur:
         cur.execute("""
-                SELECT user_id, username, email, password_hash, role_id, created_at, banned
+                SELECT user_id, username, email, role_id, created_at, banned
                 FROM users
                 ORDER BY user_id
             """)
@@ -324,10 +355,9 @@ def get_users():
             "user_id": row[0],
             "username": row[1],
             "email": row[2],
-            "password_hash": row[3],
-            "role_id": row[4],
-            "created_at": row[5],
-            "banned": row[6]
+            "role_id": row[3],
+            "created_at": row[4],
+            "banned": row[5]
         })
 
     return jsonify(users)
@@ -562,8 +592,6 @@ def update_account():
     user_id = session.get("user_id")
 
     if not user_id:
-        print(session)
-        print(session.get("user_id"))
         return jsonify({"message": "Please log in"}), 401
 
     data = request.get_json()
@@ -595,17 +623,25 @@ def update_account():
 @main.route("/api/deleteAccount", methods=["POST"])
 @limiter.limit("3 per hour")
 def delete_account():
-    # Permanently remove the currently logged-in account.
+    # Permanently remove the currently logged-in account and their dependent quiz history.
     user_id = session.get("user_id")
 
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
 
     conn = get_db_connection()
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-    conn.commit()
-    conn.close()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM results WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    session.clear()
 
     return jsonify({
         "message": "Account deleted successfully",
@@ -628,7 +664,7 @@ def sendVerificationEmail():
 
     token = secrets.token_urlsafe(32)
     verification_link = f"http://localhost:5173/verify-email?token={token}"
-    expiry = datetime.utcnow() + timedelta(hours=24)
+    expiry = datetime.now(timezone.utc) + timedelta(hours=24)
 
     conn = get_db_connection()
 
@@ -918,11 +954,9 @@ def getAdminStatus():
 @main.route("/api/count_all", methods=["GET"])
 def count_all():
     # Overview totals for the admin dashboard cards.
-
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({"message": "Please log in"}), 401
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
 
     conn = get_db_connection()
 
@@ -949,6 +983,10 @@ def count_all():
 @main.route("/api/getTop6users", methods=["GET"])
 def getTop6users():
     # Most recent users displayed in the admin overview panel.
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+
     conn = get_db_connection()
 
     with conn.cursor() as cur:
@@ -1022,7 +1060,7 @@ def ban_user(user_id):
 
     except Exception as e:
         conn.rollback()
-        print("Ban user error:", e)
+        current_app.logger.exception("Ban user error: %s", e)
 
         return jsonify({
             "message": "Failed to ban user"
@@ -1053,7 +1091,7 @@ def delete_article(article_id):
 
     except Exception as e:
         conn.rollback()
-        print("Delete article error:", e)
+        current_app.logger.exception("Delete article error: %s", e)
         return jsonify({"message": "Failed to delete article"}), 500
 
     finally:
@@ -1079,7 +1117,7 @@ def delete_quiz(quiz_id):
 
     except Exception as e:
         conn.rollback()
-        print("Delete quiz error:", e)
+        current_app.logger.exception("Delete quiz error: %s", e)
         return jsonify({"message": "Failed to delete quiz question"}), 500
 
     finally:

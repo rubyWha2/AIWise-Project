@@ -6,11 +6,13 @@ from flask_limiter.util import get_remote_address
 from datetime import timedelta
 from flask_talisman import Talisman
 import os
+from pathlib import Path
 from flask_mail import Mail
 
 
 limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
-load_dotenv()
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH, override=True)
 mail = Mail()
 
 def create_app():

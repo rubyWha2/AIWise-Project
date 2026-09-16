@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH, override=True)
 
 def get_db_connection():
     """
@@ -16,6 +18,7 @@ def get_db_connection():
     user = os.getenv("DB_USER")
     password = os.getenv("DB_PASSWORD")
     port = os.getenv("DB_PORT")
+    connect_timeout = os.getenv("DB_CONNECT_TIMEOUT", "3")
 
     if not all([host, dbname, user, password, port]):
         raise RuntimeError(
@@ -32,6 +35,7 @@ def get_db_connection():
             user=user,
             password=password,
             port=port,
+            connect_timeout=connect_timeout,
         )
     except ModuleNotFoundError:
         pass
@@ -45,6 +49,7 @@ def get_db_connection():
             user=user,
             password=password,
             port=port,
+            connect_timeout=connect_timeout,
         )
     except ModuleNotFoundError:
         raise RuntimeError(
