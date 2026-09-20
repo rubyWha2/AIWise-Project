@@ -30,7 +30,15 @@ def create_app():
 
     # Sessions are cookie based; these values control how that browser cookie behaves.
     app.secret_key = os.getenv("SECRET_KEY")
-    CORS(app, supports_credentials=True)
+    CORS(
+        app,
+        origins=[
+            "http://localhost:5174",
+            "http://localhost:5173",
+            "https://aiwise-arzh.onrender.com"
+        ],
+        supports_credentials=True
+    )
     app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE") == "True"
     app.config["SESSION_COOKIE_HTTPONLY"] = os.getenv("SESSION_COOKIE_HTTPONLY") == "True"
     app.config["SESSION_COOKIE_SAMESITE"] = os.getenv("SESSION_COOKIE_SAMESITE")

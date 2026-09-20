@@ -66,6 +66,14 @@ def verify_recaptcha_token(token, action):
         return False, "Could not verify reCAPTCHA. Check the backend internet connection and secret key.", 503
 
     recaptcha_result = recaptcha_response.json()
+    current_app.logger.warning(
+        "reCAPTCHA result: success=%s action=%s score=%s errors=%s hostname=%s",
+        recaptcha_result.get("success"),
+        recaptcha_result.get("action"),
+        recaptcha_result.get("score"),
+        recaptcha_result.get("error-codes"),
+        recaptcha_result.get("hostname")
+    )
 
     if not recaptcha_result.get("success"):
         return False, "reCAPTCHA verification failed", 400
