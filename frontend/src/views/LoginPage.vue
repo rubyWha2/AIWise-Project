@@ -109,8 +109,8 @@ async function handleLogin() {
     // reCAPTCHA v3 runs invisibly; if local setup cannot create a token, the backend decides whether to allow debug fallback.
     if (recaptcha) {
       try {
-        await withTimeout(recaptcha.recaptchaLoaded(), 2500)
-        token = await withTimeout(recaptcha.executeRecaptcha('login'), 2500)
+        await recaptcha.recaptchaLoaded()
+        token = await recaptcha.executeRecaptcha('login')
       } catch (recaptchaError) {
         console.warn('reCAPTCHA could not create a token:', recaptchaError)
       }
