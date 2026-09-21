@@ -39,14 +39,15 @@ def create_app():
         ],
         supports_credentials=True
     )
+    # HTTPS is disabled here for local development; enable it before production deployment.
+    Talisman(app, force_https=False) # change to true out of development force_https=True)
+
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "None"
     app.config["SESSION_COOKIE_PATH"] = "/"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
 
-    # HTTPS is disabled here for local development; enable it before production deployment.
-    Talisman(app, force_https=False) # change to true out of development force_https=True)
     limiter.init_app(app)
 
     # Register every API endpoint from routes.py under this Flask app.
