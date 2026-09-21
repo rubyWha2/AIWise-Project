@@ -12,7 +12,7 @@ from flask_mail import Mail
 
 limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
 ENV_PATH = Path(__file__).resolve().parent / ".env"
-load_dotenv(ENV_PATH, override=True)
+load_dotenv(ENV_PATH)
 mail = Mail()
 
 def create_app():
@@ -41,7 +41,7 @@ def create_app():
     )
     app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE") == "True"
     app.config["SESSION_COOKIE_HTTPONLY"] = os.getenv("SESSION_COOKIE_HTTPONLY") == "True"
-    app.config["SESSION_COOKIE_SAMESITE"] = os.getenv("SESSION_COOKIE_SAMESITE")
+    app.config["SESSION_COOKIE_SAMESITE"]  = "None"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
 
     # HTTPS is disabled here for local development; enable it before production deployment.
