@@ -39,9 +39,10 @@ def create_app():
         ],
         supports_credentials=True
     )
-    app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE") == "True"
-    app.config["SESSION_COOKIE_HTTPONLY"] = os.getenv("SESSION_COOKIE_HTTPONLY") == "True"
-    app.config["SESSION_COOKIE_SAMESITE"]  = "None"
+    app.config["SESSION_COOKIE_SECURE"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "None"
+    app.config["SESSION_COOKIE_PATH"] = "/"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
 
     # HTTPS is disabled here for local development; enable it before production deployment.
