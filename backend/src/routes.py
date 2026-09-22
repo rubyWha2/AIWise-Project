@@ -766,9 +766,9 @@ def resendVerificationEmail():
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
-
+    FRONTEND_URL = "https: // aiwise - arzh.onrender.com"
     token = secrets.token_urlsafe(32)
-    verification_link = f"http://localhost:5173/verify-email?token={token}"
+    verification_link = f"{FRONTEND_URL}/verify-email?token={token}"
     conn = get_db_connection()
 
     with conn.cursor() as cur:
