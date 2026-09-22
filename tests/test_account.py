@@ -105,14 +105,19 @@ def test_send_verification_email_sends_message(client, monkeypatch):
     sent_messages = []
     monkeypatch.setattr(routes, "get_db_connection", lambda: connection)
     monkeypatch.setattr(routes.secrets, "token_urlsafe", lambda length: "verify-token")
-    monkeypatch.setattr(routes.mail, "send", lambda message: sent_messages.append(message))
+    monkeypatch.setattr(
+        routes,
+        "send_verification_email",
+        lambda email, username, link: sent_messages.append((email, username, link)) or True,
+    )
     login_as(client)
 
     response = client.post("/api/sendVerificationEmail")
 
     assert response.status_code == 200
     assert response.get_json()["message"] == "Verification email sent."
-    assert sent_messages[0].recipients == ["admin@aiwise.com"]
+    assert sent_messages[0][0] == "admin@aiwise.com"
+    assert sent_messages[0][2].endswith("/verify-email?token=verify-token")
 
 
 def test_verify_email_requires_token(client):
@@ -147,11 +152,16 @@ def test_resend_verification_email_sends_message(client, monkeypatch):
     sent_messages = []
     monkeypatch.setattr(routes, "get_db_connection", lambda: connection)
     monkeypatch.setattr(routes.secrets, "token_urlsafe", lambda length: "new-token")
-    monkeypatch.setattr(routes.mail, "send", lambda message: sent_messages.append(message))
+    monkeypatch.setattr(
+        routes,
+        "send_verification_email",
+        lambda email, username, link: sent_messages.append((email, username, link)) or True,
+    )
     login_as(client)
 
     response = client.post("/api/resendVerificationEmail")
 
     assert response.status_code == 200
     assert response.get_json()["message"] == "Verification email resent."
-    assert sent_messages[0].recipients == ["admin@aiwise.com"]
+    assert sent_messages[0][0] == "admin@aiwise.com"
+    assert sent_messages[0][2].endswith("/verify-email?token=new-token")

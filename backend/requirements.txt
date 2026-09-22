@@ -11,7 +11,7 @@ python-dotenv
 ruff
 psycopg[binary]
 flask_limiter
-Flask-Mail
 gunicorn
 flask-talisman==1.1.0
 requests
+resend

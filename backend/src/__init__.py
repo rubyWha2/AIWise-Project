@@ -7,26 +7,15 @@ from datetime import timedelta
 from flask_talisman import Talisman
 import os
 from pathlib import Path
-from flask_mail import Mail
 
 
 limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(ENV_PATH)
-mail = Mail()
 
 def create_app():
     # Central Flask app factory used by backend/app.py.
     app = Flask(__name__)
-
-    # Mail settings are read from the environment so secrets stay out of source code.
-    app.config["MAIL_SERVER"] = "smtp.gmail.com"
-    app.config["MAIL_PORT"] = 587
-    app.config["MAIL_USE_TLS"] = True
-    app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
-    app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
-
-    mail.init_app(app)
 
     # Sessions are cookie based; these values control how that browser cookie behaves.
     app.secret_key = os.getenv("SECRET_KEY")

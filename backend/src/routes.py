@@ -13,14 +13,53 @@ import re
 import requests
 import os
 import secrets
-from . import mail
-from flask_mail import Message
+import resend
 
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(ENV_PATH)
 PEPPER = os.getenv("PASSWORD_PEPPER", "")
 
 main = Blueprint('main', __name__)
+
+def get_frontend_url():
+    return os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+
+def send_verification_email(email, username, verification_link):
+    resend.api_key = os.getenv("RESEND_API_KEY")
+    sender = os.getenv("RESEND_FROM_EMAIL") or os.getenv("MAIL_USERNAME")
+
+    if not resend.api_key or not sender:
+        current_app.logger.error("Resend is not configured.")
+        return False
+
+    body = f"""
+Hello {username},
+
+Thank you for creating an AIWise account.
+
+Please verify your email by clicking the link below:
+
+{verification_link}
+
+If you did not request this email, you can safely ignore it.
+
+This link expires in 24 hours.
+
+The AIWise Team
+"""
+
+    try:
+        resend.Emails.send({
+            "from": sender,
+            "to": [email],
+            "subject": "Verify your AIWise email",
+            "text": body
+        })
+    except Exception as error:
+        current_app.logger.exception("Resend email failed: %s", error)
+        return False
+
+    return True
 
 def login_rate_limit_key():
     # Limit login attempts per browser/IP and email instead of blocking every account together.
@@ -663,7 +702,7 @@ def sendVerificationEmail():
         return jsonify({"message": "Please log in"}), 401
 
     token = secrets.token_urlsafe(32)
-    verification_link = f"http://localhost:5173/verify-email?token={token}"
+    verification_link = f"{get_frontend_url()}/verify-email?token={token}"
     expiry = datetime.now(timezone.utc) + timedelta(hours=24)
 
     conn = get_db_connection()
@@ -698,29 +737,8 @@ def sendVerificationEmail():
     conn.commit()
     conn.close()
 
-    msg = Message(
-        subject="Verify your AIWise email",
-        sender=os.getenv("MAIL_USERNAME"),
-        recipients=[email]
-    )
-
-    msg.body = f"""
-    Hello {username},
-
-    Thank you for creating an AIWise account.
-
-    Please verify your email by clicking the link below:
-
-    {verification_link}
-
-    If you did not request this email, you can safely ignore it.
-
-    This link expires in 24 hours.
-
-    The AIWise Team
-    """
-
-    mail.send(msg)
+    if not send_verification_email(email, username, verification_link):
+        return jsonify({"message": "Verification email could not be sent."}), 500
 
     return jsonify({
         "message": "Verification email sent."
@@ -766,17 +784,18 @@ def resendVerificationEmail():
     user_id = session.get("user_id")
     if not user_id:
         return jsonify({"message": "Please log in"}), 401
-    FRONTEND_URL = "https: // aiwise - arzh.onrender.com"
     token = secrets.token_urlsafe(32)
-    verification_link = f"{FRONTEND_URL}/verify-email?token={token}"
+    verification_link = f"{get_frontend_url()}/verify-email?token={token}"
+    expiry = datetime.now(timezone.utc) + timedelta(hours=24)
     conn = get_db_connection()
 
     with conn.cursor() as cur:
         cur.execute("""
             UPDATE users
-            SET verification_token = %s
+            SET verification_token = %s,
+                verification_expiry = %s
             WHERE user_id = %s
-        """, (token, user_id))
+        """, (token, expiry, user_id))
 
         cur.execute("""
             SELECT email, username
@@ -795,29 +814,8 @@ def resendVerificationEmail():
     conn.close()
 
 
-    msg = Message(
-        subject="Verify your AIWise email",
-        sender=os.getenv("MAIL_USERNAME"),
-        recipients=[email]
-    )
-
-    msg.body = f"""
-    Hello {username},
-
-    Thank you for creating an AIWise account.
-
-    Please verify your email by clicking the link below:
-
-    {verification_link}
-
-    If you did not request this email, you can safely ignore it.
-
-    This link expires in 24 hours.
-
-    The AIWise Team
-    """
-
-    mail.send(msg)
+    if not send_verification_email(email, username, verification_link):
+        return jsonify({"message": "Verification email could not be sent."}), 500
 
     return jsonify({"message": "Verification email resent."}), 200
 
