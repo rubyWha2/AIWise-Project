@@ -26,27 +26,27 @@ def get_frontend_url():
 
 def send_verification_email(email, username, verification_link):
     resend.api_key = os.getenv("RESEND_API_KEY")
-    sender = os.getenv("RESEND_FROM_EMAIL") or os.getenv("MAIL_USERNAME")
+    sender = "AIWise <onboarding@resend.dev>"
 
     if not resend.api_key or not sender:
         current_app.logger.error("Resend is not configured.")
         return False
 
     body = f"""
-Hello {username},
-
-Thank you for creating an AIWise account.
-
-Please verify your email by clicking the link below:
-
-{verification_link}
-
-If you did not request this email, you can safely ignore it.
-
-This link expires in 24 hours.
-
-The AIWise Team
-"""
+    Hello {username},
+    
+    Thank you for creating an AIWise account.
+    
+    Please verify your email by clicking the link below:
+    
+    {verification_link}
+    
+    If you did not request this email, you can safely ignore it.
+    
+    This link expires in 24 hours.
+    
+    The AIWise Team
+    """
 
     try:
         resend.Emails.send({
