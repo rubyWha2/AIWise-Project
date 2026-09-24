@@ -26,7 +26,7 @@ def get_frontend_url():
 
 def send_verification_email(email, username, verification_link):
     resend.api_key = os.getenv("RESEND_API_KEY")
-    sender = "AIWise <onboarding@resend.dev>"
+    sender = "AIWise <notifications@aiwise.website>"
 
     if not resend.api_key or not sender:
         current_app.logger.error("Resend is not configured.")
