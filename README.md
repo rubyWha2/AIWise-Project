@@ -61,7 +61,7 @@ Flask and PostgreSQL.
 ### Backend
 - Python
 - Flask
-- Flask-Mail
+- Resend
 - Flask-Limiter
 - Flask-Talisman
 - Flask-CORS

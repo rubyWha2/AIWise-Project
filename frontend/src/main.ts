@@ -9,7 +9,7 @@ const app = createApp(App)
 app.use(router)
 
 // reCAPTCHA is optional in local development; the backend also has a debug fallback.
-const recaptchaSiteKey = import.meta.env.RECAPTCHA_SITE_KEY
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
 const isPlaceholderKey = /^(your_|placeholder|site_key_here|secret_key_here)/i.test(recaptchaSiteKey || '')
 
 if (recaptchaSiteKey && !isPlaceholderKey) {
